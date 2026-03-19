@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rivertown Solar — Lead Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; font-size: 14px; }
+  :root {
+    --accent: #EF9F27;
+    --accent-text: #412402;
+    --accent-light: #faeeda;
+    --green: #0F6E56;
+    --blue: #378ADD;
+    --red: #E24B4A;
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --surface2: #f8f7f3;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a1a;
+    --text2: #666;
+    --text3: #999;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  /* Layout */
+  .app { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo svg { width: 18px; height: 18px; }
+  .brand-sub { font-size: 10px; font-weight: 600; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase; }
+  .brand-name { font-size: 18px; font-weight: 600; color: var(--text); }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .conn-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; }
+  .conn-ok { background: #e8f5e9; color: #2e7d32; }
+  .conn-err { background: #fdecea; color: #c62828; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; }
+  .tab { padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .card-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+
+  /* Stat cards */
+  .stat { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .stat-value { font-size: 22px; font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green { color: var(--green); }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; max-width: 640px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; background: var(--surface); color: var(--text); outline: none; font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field input[readonly] { background: var(--surface2); color: var(--text2); }
+  .field textarea { resize: vertical; }
+  .field-full { grid-column: 1 / -1; }
+
+  /* Buttons */
+  .btn { padding: 9px 22px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .btn-primary { background: var(--accent); color: var(--accent-text); }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-ghost { background: none; border: 0.5px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover { background: var(--surface2); }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-danger { color: var(--red); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 10px; font-size: 12px; border-bottom: 0.5px solid var(--border); }
+  tr:hover td { background: var(--surface2); }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .muted { color: var(--text2); }
+
+  /* Badge */
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filters input, .filters select { padding: 7px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; background: var(--surface); color: var(--text); outline: none; }
+  .filters input { flex: 1; min-width: 140px; }
+  .count-badge { font-size: 11px; color: var(--text2); margin-left: auto; }
+
+  /* Edit panel */
+  .edit-panel { background: var(--surface); border: 0.5px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+  .edit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .edit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
+
+  /* Setup screen */
+  .setup { max-width: 500px; margin: 40px auto; padding: 0 16px; }
+  .setup-steps { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+  .step { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+  .step-num { min-width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; flex-shrink: 0; }
+  .step-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  /* Alert */
+  .alert { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 12px; }
+  .alert-ok { background: #e8f5e9; color: #2e7d32; }
+  .alert-err { background: #fdecea; color: #c62828; }
+
+  /* Progress bar */
+  .progress-wrap { display: flex; align-items: center; gap: 8px; }
+  .progress-bar { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+
+  /* Analytics table */
+  .analytics-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .analytics-table th { text-align: left; padding: 7px 10px; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); }
+  .analytics-table td { padding: 10px 10px; border-bottom: 0.5px solid var(--border); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 2.5rem; color: var(--text2); font-size: 13px; }
+
+  @media (max-width: 600px) {
+    .grid-6 { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .edit-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- Setup screen shown until URL is saved -->
+  <div id="setup-screen" style="display:none">
+    <div class="setup">
+      <div class="header-left" style="margin-bottom:24px">
+        <div class="logo">
+          <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="9" cy="9" r="4" fill="#412402"/>
+            <line x1="9" y1="1" x2="9" y2="3.5" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="9" y1="14.5" x2="9" y2="17" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="1" y1="9" x2="3.5" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="14.5" y1="9" x2="17" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div><div class="brand-sub">Rivertown Solar</div><div class="brand-name">Lead Tracker Setup</div></div>
+      </div>
+      <div class="setup-steps">
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:12px">One-Time Setup</p>
+        <div class="step"><div class="step-num">1</div><div class="step-text">Create a new Google Sheet</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Go to Extensions → Apps Script</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Paste the Apps Script v4 code and save</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-text">Copy the Web App URL and paste it below</div></div>
+      </div>
+      <div class="field">
+        <label>Apps Script Web App URL</label>
+        <input id="setup-url" type="url" placeholder="https://script.google.com/macros/s/..." style="font-family:monospace;font-size:12px">
+      </div>
+      <div id="setup-alert"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="connectSheet()">Connect Sheet</button>
+    </div>
+  </div>
+
+  <!-- Main dashboard -->
+  <div id="main-screen" style="display:none">
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="9" cy="9" r="4" fill="#412402"/>
+            <line x1="9" y1="1" x2="9" y2="3.5" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="9" y1="14.5" x2="9" y2="17" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="1" y1="9" x2="3.5" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="14.5" y1="9" x2="17" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div><div class="brand-sub">Rivertown Solar</div><div class="brand-name">Lead Tracker</div></div>
+      </div>
+      <div class="header-right">
+        <span id="conn-badge" class="conn-status conn-ok">Connected</span>
+        <button class="btn btn-ghost btn-sm" onclick="syncData()">Sync</button>
+        <button class="btn btn-ghost btn-sm" onclick="disconnect()">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('overview',this)">Overview</button>
+      <button class="tab" onclick="showTab('add',this)">Add Lead</button>
+      <button class="tab" id="leads-tab-btn" onclick="showTab('leads',this)">Leads (0)</button>
+      <button class="tab" onclick="showTab('analytics',this)">Analytics</button>
+    </div>
+
+    <!-- Overview -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="grid-6" id="stats-grid"></div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-label">Pipeline by Status</div>
+          <div style="position:relative;height:200px"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Monthly Lead Volume</div>
+          <div style="position:relative;height:200px"><canvas id="monthlyChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Leads by Source</div>
+        <div style="position:relative;height:150px"><canvas id="sourceChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Add Lead -->
+    <div id="tab-add" class="tab-content">
+      <div class="form-grid" id="add-form">
+        <div class="field"><label>Lead Name *</label><input id="f-name" type="text" placeholder="John Smith"></div>
+        <div class="field"><label>Phone</label><input id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="john@email.com"></div>
+        <div class="field"><label>Address</label><input id="f-address" type="text" placeholder="123 Main St, Jamaica NY 11434"></div>
+        <div class="field">
+          <label>Source</label>
+          <select id="f-source">
+            <option>Social Media</option><option>Company Lead</option><option>Website</option>
+            <option>SEO</option><option>Referral</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f-status">
+            <option>New</option><option>Contacted</option><option>Proposal Sent</option>
+            <option>Contract Signed</option><option>Permitted</option><option>Installed</option>
+            <option>PTO</option><option>Commission Paid</option>
+          </select>
+        </div>
+        <div class="field"><label>Date Added</label><input id="f-dateAdded" type="date"></div>
+        <div class="field"><label>System Size (kW)</label><input id="f-systemSize" type="number" step="0.1" placeholder="8.5"></div>
+        <div class="field"><label>Deal Value ($)</label><input id="f-dealValue" type="number" placeholder="35000" oninput="calcComm()"></div>
+        <div class="field"><label>Commission %</label><input id="f-commissionPct" type="number" step="0.1" placeholder="5" oninput="calcComm()"></div>
+        <div class="field"><label>Commission Amount</label><input id="f-commissionAmount" readonly placeholder="Auto-calculated"></div>
+        <div class="field"><label>Date Closed</label><input id="f-dateClosed" type="date"></div>
+        <div class="field"><label>Date Installed</label><input id="f-dateInstalled" type="date"></div>
+        <div class="field"><label>Date PTO</label><input id="f-datePTO" type="date"></div>
+        <div class="field"><label>Date Commission Paid</label><input id="f-dateCommissionPaid" type="date"></div>
+        <div class="field field-full"><label>Notes</label><textarea id="f-notes" rows="2" placeholder="Roof type, utility info, urgency..."></textarea></div>
+      </div>
+      <div id="add-alert"></div>
+      <button class="btn btn-primary" onclick="addLead()">Add Lead</button>
+    </div>
+
+    <!-- Leads -->
+    <div id="tab-leads" class="tab-content">
+      <div class="filters">
+        <input id="search" type="text" placeholder="Search leads..." oninput="renderLeadsTable()">
+        <select id="filter-source" onchange="renderLeadsTable()">
+          <option value="">All Sources</option>
+          <option>Social Media</option><option>Company Lead</option><option>Website</option>
+          <option>SEO</option><option>Referral</option><option>Other</option>
+        </select>
+        <select id="filter-status" onchange="renderLeadsTable()">
+          <option value="">All Statuses</option>
+          <option>New</option><option>Contacted</option><option>Proposal Sent</option>
+          <option>Contract Signed</option><option>Permitted</option><option>Installed</option>
+          <option>PTO</option><option>Commission Paid</option>
+        </select>
+        <span class="count-badge" id="lead-count">0 leads</span>
+      </div>
+      <div id="edit-panel" style="display:none" class="edit-panel"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Source</th><th>Status</th><th>Address</th>
+              <th>Size</th><th>Value</th><th>Commission</th>
+              <th>Added</th><th>Closed</th><th>Days</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="leads-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Analytics -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-label">Avg Days to Close by Source</div>
+          <div style="position:relative;height:190px"><canvas id="closeTimeChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Avg Days to Install by Source</div>
+          <div style="position:relative;height:190px"><canvas id="installTimeChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Source Performance</div>
+        <div class="table-wrap"><table class="analytics-table" id="perf-table"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SOURCES = ["Social Media","Company Lead","Website","SEO","Referral","Other"];
+const STATUSES = ["New","Contacted","Proposal Sent","Contract Signed","Permitted","Installed","PTO","Commission Paid"];
+const STATUS_COLORS = {
+  "New":"#888780","Contacted":"#378ADD","Proposal Sent":"#EF9F27",
+  "Contract Signed":"#639922","Permitted":"#1D9E75",
+  "Installed":"#534AB7","PTO":"#D85A30","Commission Paid":"#0F6E56"
+};
+const SRC_COLORS = ["#378ADD","#EF9F27","#639922","#534AB7","#D85A30","#888780"];
+
+let leads = [];
+let scriptUrl = "";
+let charts = {};
+let editingId = null;
+
+// ── Storage ──────────────────────────────────────────────────
+function saveUrl(url) { try { localStorage.setItem("rt_url", url); } catch(e) {} }
+function loadUrl() { try { return localStorage.getItem("rt_url") || ""; } catch(e) { return ""; } }
+function clearUrl() { try { localStorage.removeItem("rt_url"); } catch(e) {} }
+
+// ── Init ─────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  const url = loadUrl();
+  if (url) { scriptUrl = url; showMain(); fetchLeads(); }
+  else showSetup();
+  document.getElementById("f-dateAdded").value = today();
+});
+
+function showSetup() {
+  document.getElementById("setup-screen").style.display = "block";
+  document.getElementById("main-screen").style.display = "none";
+}
+function showMain() {
+  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("main-screen").style.display = "block";
+}
+function disconnect() {
+  clearUrl(); scriptUrl = ""; leads = [];
+  showSetup();
+}
+
+// ── JSONP API ────────────────────────────────────────────────
+function jsonpCall(url) {
+  return new Promise((resolve, reject) => {
+    const cb = "rt_cb_" + Date.now() + "_" + Math.floor(Math.random()*9999);
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      cleanup(); reject(new Error("Request timed out. Check your Apps Script URL."));
+    }, 20000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error("Failed to reach Apps Script. Check the URL and deployment settings.")); };
+    script.src = url + "&callback=" + cb;
+    document.head.appendChild(script);
+  });
+}
+
+async function apiCall(action, data) {
+  let u = scriptUrl + "?action=" + action;
+  if (action === "delete" && data) u += "&id=" + encodeURIComponent(data.id);
+  else if (data) u += "&data=" + encodeURIComponent(JSON.stringify(data));
+  return jsonpCall(u);
+}
+
+// ── Connect ──────────────────────────────────────────────────
+async function connectSheet() {
+  const url = document.getElementById("setup-url").value.trim();
+  const alertEl = document.getElementById("setup-alert");
+  if (!url.includes("script.google.com")) {
+    alertEl.innerHTML = '<div class="alert alert-err">That doesn\'t look like a valid Apps Script URL.</div>';
+    return;
+  }
+  scriptUrl = url;
+  alertEl.innerHTML = '<div class="alert" style="background:#fff3e0;color:#e65100">Connecting...</div>';
+  try {
+    const res = await apiCall("get");
+    if (res.success) {
+      saveUrl(url);
+      leads = res.data || [];
+      showMain();
+      renderAll();
+    } else {
+      alertEl.innerHTML = '<div class="alert alert-err">Script returned an error: ' + (res.error || "Unknown") + '</div>';
+    }
+  } catch(e) {
+    alertEl.innerHTML = '<div class="alert alert-err">' + e.message + '</div>';
+  }
+}
+
+// ── Fetch ────────────────────────────────────────────────────
+async function fetchLeads() {
+  setBadge(false, "Syncing...");
+  try {
+    const res = await apiCall("get");
+    if (res.success) {
+      leads = res.data || [];
+      renderAll();
+      setBadge(true);
+    } else setBadge(false, "Error");
+  } catch(e) { setBadge(false, "Connection error"); }
+}
+function syncData() { fetchLeads(); }
+
+function setBadge(ok, msg) {
+  const b = document.getElementById("conn-badge");
+  if (ok) { b.className = "conn-status conn-ok"; b.textContent = "Connected"; }
+  else { b.className = "conn-status conn-err"; b.textContent = msg || "Connection error"; }
+}
+
+// ── Add Lead ─────────────────────────────────────────────────
+function calcComm() {
+  const dv = parseFloat(document.getElementById("f-dealValue").value) || 0;
+  const cp = parseFloat(document.getElementById("f-commissionPct").value) || 0;
+  const ca = dv && cp ? "$" + Math.round(dv * cp / 100).toLocaleString() : "";
+  document.getElementById("f-commissionAmount").value = ca;
+}
+
+function getFormData() {
+  return {
+    name: document.getElementById("f-name").value.trim(),
+    email: document.getElementById("f-email").value.trim(),
+    phone: document.getElementById("f-phone").value.trim(),
+    address: document.getElementById("f-address").value.trim(),
+    source: document.getElementById("f-source").value,
+    status: document.getElementById("f-status").value,
+    dateAdded: document.getElementById("f-dateAdded").value,
+    systemSize: document.getElementById("f-systemSize").value,
+    dealValue: document.getElementById("f-dealValue").value,
+    commissionPct: document.getElementById("f-commissionPct").value,
+    commissionAmount: document.getElementById("f-commissionAmount").value.replace(/[$,]/g,""),
+    dateClosed: document.getElementById("f-dateClosed").value,
+    dateInstalled: document.getElementById("f-dateInstalled").value,
+    datePTO: document.getElementById("f-datePTO").value,
+    dateCommissionPaid: document.getElementById("f-dateCommissionPaid").value,
+    notes: document.getElementById("f-notes").value.trim()
+  };
+}
+
+async function addLead() {
+  const alertEl = document.getElementById("add-alert");
+  const data = getFormData();
+  if (!data.name) { alertEl.innerHTML = '<div class="alert alert-err">Lead name is required.</div>'; return; }
+  alertEl.innerHTML = '<div class="alert" style="background:#fff3e0;color:#e65100">Saving...</div>';
+  try {
+    const res = await apiCall("add", data);
+    if (res.success) {
+      leads = res.data;
+      renderAll();
+      clearAddForm();
+      alertEl.innerHTML = '<div class="alert alert-ok">Lead added successfully.</div>';
+      setTimeout(() => alertEl.innerHTML = "", 3000);
+    } else alertEl.innerHTML = '<div class="alert alert-err">' + (res.error || "Failed to save.") + '</div>';
+  } catch(e) { alertEl.innerHTML = '<div class="alert alert-err">' + e.message + '</div>'; }
+}
+
+function clearAddForm() {
+  ["f-name","f-email","f-phone","f-address","f-systemSize","f-dealValue",
+   "f-commissionPct","f-commissionAmount","f-dateClosed","f-dateInstalled",
+   "f-datePTO","f-dateCommissionPaid","f-notes"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("f-source").value = "Social Media";
+  document.getElementById("f-status").value = "New";
+  document.getElementById("f-dateAdded").value = today();
+}
+
+// ── Edit Lead ────────────────────────────────────────────────
+function openEdit(lead) {
+  editingId = lead.id;
+  const panel = document.getElementById("edit-panel");
+  panel.style.display = "block";
+
+  const statusOpts = STATUSES.map(s => `<option ${s===lead.status?"selected":""}>${s}</option>`).join("");
+  const srcOpts = SOURCES.map(s => `<option ${s===lead.source?"selected":""}>${s}</option>`).join("");
+
+  panel.innerHTML = `
+    <div class="edit-header">
+      <span style="font-size:14px;font-weight:600">Edit: ${lead.name}</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeEdit()">Close</button>
+    </div>
+    <div class="edit-grid">
+      ${editField("Lead Name","e-name","text",lead.name)}
+      ${editField("Phone","e-phone","tel",lead.phone)}
+      ${editField("Email","e-email","email",lead.email)}
+      ${editField("Address","e-address","text",lead.address)}
+      <div class="field"><label>Source</label><select id="e-source">${srcOpts}</select></div>
+      <div class="field"><label>Status</label><select id="e-status">${statusOpts}</select></div>
+      ${editField("System Size (kW)","e-systemSize","number",lead.systemSize)}
+      ${editField("Deal Value ($)","e-dealValue","number",lead.dealValue)}
+      ${editField("Commission %","e-commissionPct","number",lead.commissionPct)}
+      ${editField("Commission Amount ($)","e-commissionAmount","number",lead.commissionAmount)}
+      ${editField("Date Added","e-dateAdded","date",lead.dateAdded)}
+      ${editField("Date Closed","e-dateClosed","date",lead.dateClosed)}
+      ${editField("Date Installed","e-dateInstalled","date",lead.dateInstalled)}
+      ${editField("Date PTO","e-datePTO","date",lead.datePTO)}
+      ${editField("Date Commission Paid","e-dateCommissionPaid","date",lead.dateCommissionPaid)}
+    </div>
+    <div class="field" style="margin-top:4px"><label>Notes</label><textarea id="e-notes" rows="2">${lead.notes||""}</textarea></div>
+    <div id="edit-alert"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" onclick="saveLead('${lead.id}')">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+  `;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function editField(label, id, type, val) {
+  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${val||""}"></div>`;
+}
+
+function closeEdit() {
+  editingId = null;
+  document.getElementById("edit-panel").style.display = "none";
+}
+
+async function saveLead(id) {
+  const alertEl = document.getElementById("edit-alert");
+  const lead = {
+    id,
+    name: document.getElementById("e-name").value.trim(),
+    email: document.getElementById("e-email").value.trim(),
+    phone: document.getElementById("e-phone").value.trim(),
+    address: document.getElementById("e-address").value.trim(),
+    source: document.getElementById("e-source").value,
+    status: document.getElementById("e-status").value,
+    systemSize: document.getElementById("e-systemSize").value,
+    dealValue: document.getElementById("e-dealValue").value,
+    commissionPct: document.getElementById("e-commissionPct").value,
+    commissionAmount: document.getElementById("e-commissionAmount").value,
+    dateAdded: document.getElementById("e-dateAdded").value,
+    dateClosed: document.getElementById("e-dateClosed").value,
+    dateInstalled: document.getElementById("e-dateInstalled").value,
+    datePTO: document.getElementById("e-datePTO").value,
+    dateCommissionPaid: document.getElementById("e-dateCommissionPaid").value,
+    notes: document.getElementById("e-notes").value.trim()
+  };
+  alertEl.innerHTML = '<div class="alert" style="background:#fff3e0;color:#e65100">Saving...</div>';
+  try {
+    const res = await apiCall("update", lead);
+    if (res.success) { leads = res.data; renderAll(); closeEdit(); }
+    else alertEl.innerHTML = '<div class="alert alert-err">' + (res.error || "Update failed.") + '</div>';
+  } catch(e) { alertEl.innerHTML = '<div class="alert alert-err">' + e.message + '</div>'; }
+}
+
+async function deleteLead(id, name) {
+  if (!confirm("Delete " + name + "?")) return;
+  try {
+    const res = await apiCall("delete", { id });
+    if (res.success) { leads = res.data; renderAll(); closeEdit(); }
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+// ── Render All ────────────────────────────────────────────────
+function renderAll() {
+  renderStats();
+  renderCharts();
+  renderLeadsTable();
+  renderAnalytics();
+  document.getElementById("leads-tab-btn").textContent = "Leads (" + leads.length + ")";
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function renderStats() {
+  const pipeline = leads.filter(l => l.status !== "Commission Paid");
+  const closed = leads.filter(l => l.status === "Commission Paid");
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const closedThisMonth = closed.filter(l => (l.dateCommissionPaid||"").startsWith(thisMonth)).length;
+  const pipeVal = pipeline.reduce((s,l) => s + (parseFloat(l.dealValue)||0), 0);
+  const totalComm = closed.reduce((s,l) => s + (parseFloat(l.commissionAmount)||0), 0);
+  const times = closed.filter(l => l.dateAdded && l.dateClosed)
+    .map(l => daysBetween(l.dateAdded, l.dateClosed)).filter(d => d !== null);
+  const avgClose = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : null;
+
+  document.getElementById("stats-grid").innerHTML = `
+    <div class="stat"><div class="stat-label">Total Leads</div><div class="stat-value">${leads.length}</div></div>
+    <div class="stat"><div class="stat-label">Active Pipeline</div><div class="stat-value">${pipeline.length}</div></div>
+    <div class="stat"><div class="stat-label">Closed This Month</div><div class="stat-value">${closedThisMonth}</div></div>
+    <div class="stat"><div class="stat-label">Pipeline Value</div><div class="stat-value accent">${fmt$(pipeVal)}</div></div>
+    <div class="stat"><div class="stat-label">Total Commission</div><div class="stat-value green">${fmt$(totalComm)}</div></div>
+    <div class="stat"><div class="stat-label">Avg Days to Close</div><div class="stat-value">${avgClose !== null ? avgClose+"d" : "N/A"}</div></div>
+  `;
+}
+
+// ── Charts ───────────────────────────────────────────────────
+function destroyChart(name) { if (charts[name]) { charts[name].destroy(); delete charts[name]; } }
+
+function renderCharts() {
+  // Status chart
+  destroyChart("status");
+  const statusData = STATUSES.map(s => leads.filter(l => l.status===s).length);
+  charts.status = new Chart(document.getElementById("statusChart"), {
+    type: "bar",
+    data: {
+      labels: STATUSES.map(s => s.length > 12 ? s.slice(0,12)+"…" : s),
+      datasets: [{ data: statusData, backgroundColor: STATUSES.map(s => STATUS_COLORS[s]), borderRadius: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { stepSize: 1, font: { size: 10 } } } } }
+  });
+
+  // Monthly chart
+  destroyChart("monthly");
+  const months = Array.from({length:6},(_,i) => {
+    const d = new Date(); d.setMonth(d.getMonth()-(5-i));
+    return { key: d.toISOString().slice(0,7), label: d.toLocaleString("default",{month:"short"}) };
+  });
+  charts.monthly = new Chart(document.getElementById("monthlyChart"), {
+    type: "line",
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [{ data: months.map(m => leads.filter(l=>(l.dateAdded||"").startsWith(m.key)).length),
+        borderColor: "#EF9F27", backgroundColor: "rgba(239,159,39,0.1)", fill: true,
+        tension: 0.3, pointBackgroundColor: "#EF9F27", pointRadius: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { stepSize: 1, font: { size: 10 } } } } }
+  });
+
+  // Source chart
+  destroyChart("source");
+  const srcData = SOURCES.map(s => leads.filter(l=>l.source===s).length);
+  charts.source = new Chart(document.getElementById("sourceChart"), {
+    type: "bar",
+    data: {
+      labels: SOURCES,
+      datasets: [{ data: srcData, backgroundColor: SRC_COLORS, borderRadius: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { stepSize: 1, font: { size: 10 } } } } }
+  });
+}
+
+// ── Leads Table ──────────────────────────────────────────────
+function renderLeadsTable() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const src = document.getElementById("filter-source").value;
+  const status = document.getElementById("filter-status").value;
+
+  const filtered = leads.filter(l =>
+    (!search || (l.name||"").toLowerCase().includes(search) || (l.address||"").toLowerCase().includes(search)) &&
+    (!src || l.source === src) &&
+    (!status || l.status === status)
+  );
+
+  document.getElementById("lead-count").textContent = filtered.length + " leads";
+
+  const tbody = document.getElementById("leads-tbody");
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">No leads match your filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(l => {
+    const dtc = daysBetween(l.dateAdded, l.dateClosed);
+    const color = STATUS_COLORS[l.status] || "#888";
+    return `<tr>
+      <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name||"—"}</td>
+      <td class="muted">${l.source||"—"}</td>
+      <td><span class="badge" style="background:${color}22;color:${color}">${l.status}</span></td>
+      <td class="muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${l.address||"—"}</td>
+      <td class="mono">${l.systemSize ? l.systemSize+"kW" : "—"}</td>
+      <td class="mono">${fmt$(l.dealValue)}</td>
+      <td class="mono" style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</td>
+      <td class="muted" style="font-size:11px">${l.dateAdded||"—"}</td>
+      <td class="muted" style="font-size:11px">${l.dateClosed||"—"}</td>
+      <td class="mono" style="font-size:11px">${dtc !== null ? dtc+"d" : "—"}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ── Analytics ─────────────────────────────────────────────────
+function renderAnalytics() {
+  // Close time chart
+  destroyChart("closeTime");
+  const closeData = SOURCES.map((s,i) => {
+    const c = leads.filter(l => l.source===s && l.dateAdded && l.dateClosed);
+    if (!c.length) return null;
+    return { s, avg: Math.round(c.reduce((a,l)=>a+daysBetween(l.dateAdded,l.dateClosed),0)/c.length), color: SRC_COLORS[i] };
+  }).filter(Boolean);
+
+  if (closeData.length) {
+    charts.closeTime = new Chart(document.getElementById("closeTimeChart"), {
+      type: "bar",
+      data: { labels: closeData.map(d=>d.s), datasets: [{ data: closeData.map(d=>d.avg), backgroundColor: closeData.map(d=>d.color), borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
+    });
+  }
+
+  // Install time chart
+  destroyChart("installTime");
+  const installData = SOURCES.map((s,i) => {
+    const c = leads.filter(l => l.source===s && l.dateClosed && l.dateInstalled);
+    if (!c.length) return null;
+    return { s, avg: Math.round(c.reduce((a,l)=>a+daysBetween(l.dateClosed,l.dateInstalled),0)/c.length), color: SRC_COLORS[i] };
+  }).filter(Boolean);
+
+  if (installData.length) {
+    charts.installTime = new Chart(document.getElementById("installTimeChart"), {
+      type: "bar",
+      data: { labels: installData.map(d=>d.s), datasets: [{ data: installData.map(d=>d.avg), backgroundColor: installData.map(d=>d.color), borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
+    });
+  }
+
+  // Performance table
+  const perfData = SOURCES.map((s,i) => {
+    const all = leads.filter(l => l.source===s);
+    if (!all.length) return null;
+    const paid = all.filter(l => l.status==="Commission Paid");
+    const totalComm = paid.reduce((a,l) => a+(parseFloat(l.commissionAmount)||0), 0);
+    const rate = Math.round((paid.length/all.length)*100);
+    return { s, count: all.length, closed: paid.length, rate, totalComm: Math.round(totalComm), commPerLead: all.length ? Math.round(totalComm/all.length) : 0, color: SRC_COLORS[i] };
+  }).filter(Boolean);
+
+  const tbl = document.getElementById("perf-table");
+  if (!perfData.length) { tbl.innerHTML = '<tr><td class="empty">Not enough data yet.</td></tr>'; return; }
+
+  tbl.innerHTML = `
+    <thead><tr>
+      <th>Source</th><th>Leads</th><th>Closed</th><th>Close Rate</th><th>Total Commission</th><th>Commission / Lead</th>
+    </tr></thead>
+    <tbody>
+      ${perfData.map(d => `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${d.color};margin-right:8px;vertical-align:middle"></span>${d.s}</td>
+        <td class="mono">${d.count}</td>
+        <td class="mono">${d.closed}</td>
+        <td>
+          <div class="progress-wrap">
+            <div class="progress-bar"><div class="progress-fill" style="width:${d.rate}%;background:${d.color}"></div></div>
+            <span class="mono" style="min-width:34px">${d.rate}%</span>
+          </div>
+        </td>
+        <td class="mono" style="color:var(--green);font-weight:600">${fmt$(d.totalComm)}</td>
+        <td class="mono">${fmt$(d.commPerLead)}</td>
+      </tr>`).join("")}
+    </tbody>
+  `;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+  document.getElementById("tab-" + name).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function today() { return new Date().toISOString().split("T")[0]; }
+function daysBetween(d1, d2) {
+  if (!d1 || !d2) return null;
+  return Math.round((new Date(d2) - new Date(d1)) / 86400000);
+}
+function fmt$(n) { return n ? "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"; }
+</script>
+</body>
+</html>
