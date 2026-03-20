@@ -497,7 +497,8 @@ function openEdit(lead) {
 }
 
 function ef(label,id,type,val) {
-  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${val||""}"></div>`;
+  const cleaned = type === "date" ? (cleanDate(val)||"") : (val||"");
+  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${cleaned}"></div>`;
 }
 function closeEdit() { document.getElementById("edit-panel").style.display="none"; }
 
@@ -661,8 +662,8 @@ function renderLeadsTable() {
         <td class="mono">${l.systemSize?l.systemSize+"kW":"—"}</td>
         <td class="mono">${fmt$(l.dealValue)}</td>
         <td class="mono" style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</td>
-        <td class="muted" style="font-size:11px">${l.dateAdded||"—"}</td>
-        <td class="muted" style="font-size:11px">${l.dateClosed||"—"}</td>
+        <td class="muted" style="font-size:11px">${cleanDate(l.dateAdded)||"—"}</td>
+        <td class="muted" style="font-size:11px">${cleanDate(l.dateClosed)||"—"}</td>
         <td class="mono" style="font-size:11px">${dtc!==null?dtc+"d":"—"}</td>
         <td><div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
@@ -682,7 +683,7 @@ function renderLeadsTable() {
       <div class="lead-card-header">
         <div>
           <div class="lead-card-name">${l.name||"—"}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px">${l.source||""} · ${l.dateAdded||""}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${l.source||""} · ${cleanDate(l.dateAdded)||""}</div>
         </div>
         <span class="badge" style="background:${color}22;color:${color}">${l.status}</span>
       </div>
@@ -772,7 +773,16 @@ function showTab(name, btn) {
 
 // ── Helpers ───────────────────────────────────────────────────
 function today() { return new Date().toISOString().split("T")[0]; }
-function daysBetween(d1,d2) { if(!d1||!d2) return null; return Math.round((new Date(d2)-new Date(d1))/86400000); }
+function cleanDate(raw) {
+  if (!raw || raw === "—") return "";
+  // Already in yyyy-mm-dd format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // Full timestamp — parse and reformat
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toISOString().split("T")[0];
+}
+function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
 function fmt$(n) { return n ? "$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0}) : "—"; }
 </script>
 </body>
