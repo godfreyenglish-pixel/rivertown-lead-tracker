@@ -484,7 +484,7 @@ function openEdit(lead) {
       <div class="notes-history">${notesHtml}</div>
       <div class="note-add">
         <textarea id="new-note-text" rows="2" placeholder="Add a new note..."></textarea>
-        <button class="btn btn-primary btn-sm" style="align-self:flex-end;white-space:nowrap" onclick="addNote('${lead.id}','${(lead.notes||"").replace(/'/g,"\\'")}')">Add Note</button>
+        <button class="btn btn-primary btn-sm" style="align-self:flex-end;white-space:nowrap" onclick="addNote('${lead.id}')">Add Note</button>
       </div>
     </div>
     <div id="edit-alert" style="margin-top:10px"></div>
@@ -501,12 +501,12 @@ function ef(label,id,type,val) {
 }
 function closeEdit() { document.getElementById("edit-panel").style.display="none"; }
 
-async function addNote(leadId, existingNotes) {
+async function addNote(leadId) {
   const newText = document.getElementById("new-note-text").value.trim();
   if (!newText) return;
-  const updatedNotes = prependNote(existingNotes, newText);
   const lead = leads.find(l => l.id === leadId);
   if (!lead) return;
+  const updatedNotes = prependNote(lead.notes || "", newText);
   const updated = { ...lead, notes: updatedNotes };
   try {
     const res = await apiCall("update", updated);
