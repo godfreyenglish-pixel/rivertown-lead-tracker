@@ -580,7 +580,7 @@ function renderArchive() {
       <td class="muted" style="font-size:11px">${cleanDate(l.dateAdded)||"—"}</td>
       <td class="muted" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastNote}</td>
       <td><div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})' title="Restore or edit">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditById('${l.id}')" title="Restore or edit">Edit</button>
         <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
       </div></td>
     </tr>`;
@@ -598,7 +598,7 @@ function renderArchive() {
         </div>
         ${l.dealValue ? `<div class="lead-card-row"><span>Deal Value</span><span>${fmt$(l.dealValue)}</span></div>` : ""}
         <div class="lead-card-actions">
-          <button class="btn btn-primary btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit / Restore</button>
+          <button class="btn btn-primary btn-sm" onclick="openEditById('${l.id}')">Edit / Restore</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
         </div>
       </div>`).join("");
