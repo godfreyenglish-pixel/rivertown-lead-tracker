@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Post-Call Recap</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -54,124 +53,124 @@ textarea::placeholder{color:var(--text-dim)}
 </head>
 <body>
 <div class="container" id="app">
-  <div class="header">
-    <div class="header-icon">&#x1F4DE;</div>
-    <div>
-      <h1>Post-Call Recap</h1>
-      <p>Send a recap email after your discovery call</p>
-    </div>
-  </div>
-  <div class="status-bar" id="statusBar">
-    <div class="status-dot loading" id="statusDot"></div>
-    <span id="statusText">Connecting...</span>
-  </div>
-  <div id="content">
-    <div class="loading-spinner">
-      <div class="spinner"></div>
-      Loading leads...
-    </div>
-  </div>
+<div class="header"><div class="header-icon">&#x1F4DE;</div><div><h1>Post-Call Recap</h1><p>Send a recap email after your discovery call</p></div></div>
+<div class="status-bar" id="statusBar"><div class="status-dot loading" id="statusDot"></div><span id="statusText">Connecting...</span></div>
+<div id="content"><div class="loading-spinner"><div class="spinner"></div>Loading leads...</div></div>
 </div>
 <script>
-var API_URL='https://script.google.com/macros/s/AKfycbzh3pRiZhDyVq8v--ERJIZ9DSJJmT10qryWqRZj7ie3nOD6zfSrtIwUfauZ7wMc57j6HA/exec';
-var leads=[];
-var selectedLeadId=null;
+var scriptUrl = "https://script.google.com/macros/s/AKfycbzh3pRiZhDyVq8v--ERJIZ9DSJJmT10qryWqRZj7ie3nOD6zfSrtIwUfauZ7wMc57j6HA/exec";
+var leads = [];
+var selectedLeadId = null;
 
-function jsonp(url){
-  return new Promise(function(resolve,reject){
-    var cb='jsonp_'+Date.now()+'_'+Math.floor(Math.random()*10000);
-    window[cb]=function(data){resolve(data);delete window[cb];};
-    var s=document.createElement('script');
-    s.src=url+'&callback='+cb;
-    s.onerror=function(){reject(new Error('JSONP failed'));delete window[cb];};
-    document.head.appendChild(s);
-    setTimeout(function(){if(window[cb]){reject(new Error('timeout'));delete window[cb];}},15000);
+function jsonpCall(url) {
+  return new Promise(function(resolve, reject) {
+    var cb = "rt_" + Date.now() + "_" + Math.floor(Math.random() * 9999);
+    var script = document.createElement("script");
+    var timer = setTimeout(function() { cleanup(); reject(new Error("Request timed out.")); }, 20000);
+    function cleanup() { clearTimeout(timer); delete window[cb]; if (script.parentNode) script.parentNode.removeChild(script); }
+    window[cb] = function(data) { cleanup(); resolve(data); };
+    script.onerror = function() { cleanup(); reject(new Error("Failed to reach Apps Script.")); };
+    script.src = url + "&callback=" + cb;
+    document.head.appendChild(script);
   });
 }
 
-function init(){
-  jsonp(API_URL+'?action=get').then(function(data){
-    leads=(data||[]).filter(function(l){
-      return l.status==='New'||l.status==='Contacted'||l.status==='Proposal Sent';
-    }).sort(function(a,b){return new Date(b.dateAdded)-new Date(a.dateAdded);});
-    document.getElementById('statusDot').className='status-dot connected';
-    document.getElementById('statusText').textContent=leads.length+' active lead'+(leads.length!==1?'s':'');
-    renderLeads();
-  }).catch(function(){
-    document.getElementById('statusDot').className='status-dot disconnected';
-    document.getElementById('statusText').textContent='Connection failed';
-    document.getElementById('content').innerHTML='<div class="empty-state"><div class="icon">&#x26A0;&#xFE0F;</div><p>Could not connect to your lead database.</p><p style="margin-top:8px;font-size:12px">Check your connection and refresh.</p></div>';
+function apiCall(action, data) {
+  var u = scriptUrl + "?action=" + action;
+  if (data) u += "&" + data;
+  return jsonpCall(u);
+}
+
+function init() {
+  apiCall("get").then(function(res) {
+    if (res.success) {
+      leads = (res.data || []).filter(function(l) {
+        return l.status === "New" || l.status === "Contacted" || l.status === "Proposal Sent";
+      }).sort(function(a, b) { return new Date(b.dateAdded) - new Date(a.dateAdded); });
+      document.getElementById("statusDot").className = "status-dot connected";
+      document.getElementById("statusText").textContent = leads.length + " active lead" + (leads.length !== 1 ? "s" : "");
+      renderLeads();
+    } else {
+      showError();
+    }
+  }).catch(function() {
+    showError();
   });
 }
 
-function renderLeads(){
-  if(leads.length===0){
-    document.getElementById('content').innerHTML='<div class="empty-state"><div class="icon">&#x1F4ED;</div><p>No active leads to recap.</p></div>';
+function showError() {
+  document.getElementById("statusDot").className = "status-dot disconnected";
+  document.getElementById("statusText").textContent = "Connection failed";
+  document.getElementById("content").innerHTML = '<div class="empty-state"><div class="icon">&#x26A0;&#xFE0F;</div><p>Could not connect to your lead database.</p><p style="margin-top:8px;font-size:12px">Check your connection and refresh.</p></div>';
+}
+
+function renderLeads() {
+  if (leads.length === 0) {
+    document.getElementById("content").innerHTML = '<div class="empty-state"><div class="icon">&#x1F4ED;</div><p>No active leads to recap.</p></div>';
     return;
   }
-  var h='<label>Select Lead</label><div class="lead-grid">';
-  for(var i=0;i<leads.length;i++){
-    var l=leads[i];
-    h+='<div class="lead-card" id="card-'+l.id+'" onclick="selectLead(\''+l.id+'\')">';
-    h+='<div class="name">'+esc(l.name||'Unknown')+'</div>';
-    h+='<div class="meta"><span class="status-badge">'+esc(l.status)+'</span>';
-    if(l.phone) h+='<span>'+esc(l.phone)+'</span>';
-    h+='</div></div>';
+  var h = '<label>Select Lead</label><div class="lead-grid">';
+  for (var i = 0; i < leads.length; i++) {
+    var l = leads[i];
+    h += '<div class="lead-card" id="card-' + l.id + '" onclick="selectLead(\'' + l.id + '\')">';
+    h += '<div class="name">' + esc(l.name || "Unknown") + '</div>';
+    h += '<div class="meta"><span class="status-badge">' + esc(l.status) + '</span>';
+    if (l.phone) h += '<span>' + esc(l.phone) + '</span>';
+    h += '</div></div>';
   }
-  h+='</div>';
-  h+='<label>Call Notes</label>';
-  h+='<textarea id="callNotes" placeholder="What did you cover? Their goals, concerns, what you recommended..."></textarea>';
-  h+='<div class="hint">Keep it rough. Claude will polish it into a professional recap email.</div>';
-  h+='<button class="btn btn-primary" id="sendBtn" onclick="sendRecap()" disabled>Select a lead first</button>';
-  document.getElementById('content').innerHTML=h;
+  h += '</div>';
+  h += '<label>Call Notes</label>';
+  h += '<textarea id="callNotes" placeholder="What did you cover? Their goals, concerns, what you recommended..."></textarea>';
+  h += '<div class="hint">Keep it rough. Claude will polish it into a professional recap email.</div>';
+  h += '<button class="btn btn-primary" id="sendBtn" onclick="sendRecap()" disabled>Select a lead first</button>';
+  document.getElementById("content").innerHTML = h;
 }
 
-function selectLead(id){
-  selectedLeadId=id;
-  var cards=document.querySelectorAll('.lead-card');
-  for(var i=0;i<cards.length;i++) cards[i].classList.remove('selected');
-  document.getElementById('card-'+id).classList.add('selected');
-  var btn=document.getElementById('sendBtn');
-  btn.disabled=false;
-  btn.textContent='Send Recap Email';
+function selectLead(id) {
+  selectedLeadId = id;
+  var cards = document.querySelectorAll(".lead-card");
+  for (var i = 0; i < cards.length; i++) cards[i].classList.remove("selected");
+  document.getElementById("card-" + id).classList.add("selected");
+  var btn = document.getElementById("sendBtn");
+  btn.disabled = false;
+  btn.textContent = "Send Recap Email";
 }
 
-function sendRecap(){
-  var notes=document.getElementById('callNotes').value.trim();
-  if(!selectedLeadId) return;
-  if(!notes){
-    document.getElementById('callNotes').style.borderColor='var(--red)';
-    document.getElementById('callNotes').setAttribute('placeholder','Please add your call notes before sending...');
+function sendRecap() {
+  var notes = document.getElementById("callNotes").value.trim();
+  if (!selectedLeadId) return;
+  if (!notes) {
+    document.getElementById("callNotes").style.borderColor = "var(--red)";
+    document.getElementById("callNotes").setAttribute("placeholder", "Please add your call notes before sending...");
     return;
   }
-  var btn=document.getElementById('sendBtn');
-  btn.disabled=true;
-  btn.textContent='Sending...';
-  btn.className='btn btn-primary sending';
+  var btn = document.getElementById("sendBtn");
+  btn.disabled = true;
+  btn.textContent = "Sending...";
+  btn.className = "btn btn-primary sending";
 
-  var url=API_URL+'?action=recap&id='+encodeURIComponent(selectedLeadId)+'&notes='+encodeURIComponent(notes);
-  jsonp(url).then(function(data){
-    var lead=null;
-    for(var i=0;i<leads.length;i++){if(leads[i].id===selectedLeadId){lead=leads[i];break;}}
-    var firstName=(lead?lead.name:'').split(' ')[0];
-    document.getElementById('content').innerHTML='<div class="success-card"><div class="icon">&#x2705;</div><div class="title">Recap Sent!</div><div class="subtitle">'+esc(firstName)+' will get the email shortly</div></div><button class="btn btn-reset" onclick="reset()">Send Another Recap</button>';
-  }).catch(function(){
-    btn.disabled=false;
-    btn.textContent='Retry Send';
-    btn.className='btn btn-primary';
-    document.getElementById('statusDot').className='status-dot disconnected';
-    document.getElementById('statusText').textContent='Send failed. Try again.';
+  apiCall("recap", "id=" + encodeURIComponent(selectedLeadId) + "&notes=" + encodeURIComponent(notes)).then(function(res) {
+    var lead = null;
+    for (var i = 0; i < leads.length; i++) { if (leads[i].id === selectedLeadId) { lead = leads[i]; break; } }
+    var firstName = (lead ? lead.name : "").split(" ")[0];
+    document.getElementById("content").innerHTML = '<div class="success-card"><div class="icon">&#x2705;</div><div class="title">Recap Sent!</div><div class="subtitle">' + esc(firstName) + ' will get the email shortly</div></div><button class="btn btn-reset" onclick="reset()">Send Another Recap</button>';
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = "Retry Send";
+    btn.className = "btn btn-primary";
+    document.getElementById("statusDot").className = "status-dot disconnected";
+    document.getElementById("statusText").textContent = "Send failed. Try again.";
   });
 }
 
-function reset(){
-  selectedLeadId=null;
+function reset() {
+  selectedLeadId = null;
   renderLeads();
-  document.getElementById('statusDot').className='status-dot connected';
-  document.getElementById('statusText').textContent=leads.length+' active leads';
+  document.getElementById("statusDot").className = "status-dot connected";
+  document.getElementById("statusText").textContent = leads.length + " active leads";
 }
 
-function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 
 init();
 </script>
