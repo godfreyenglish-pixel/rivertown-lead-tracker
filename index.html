@@ -261,7 +261,7 @@
       <!-- Desktop table -->
       <div class="table-wrap">
         <table><thead><tr>
-          <th>Name</th><th>Source</th><th>Status</th><th>Address</th><th>Size</th><th>Value</th><th>Commission</th><th>Added</th><th>Closed</th><th>Days</th><th></th>
+          <th>Name</th><th>Source</th><th>Status</th><th>Address</th><th>Size</th><th>Value</th><th>Commission</th><th>Added</th><th>Closed</th><th>Days</th><th>Last Touch</th><th></th>
         </tr></thead><tbody id="leads-tbody"></tbody></table>
       </div>
       <!-- Mobile cards -->
@@ -639,10 +639,10 @@ function renderStats() {
 function renderReminders() {
   const today_d = new Date();
   const stale = leads.filter(l => {
-    if (!l.dateAdded || l.status === "Commission Paid" || l.status === "PTO" || l.status === "Not Moving Forward") return false;
-    const d = daysBetween(l.dateAdded, today_d.toISOString().split("T")[0]);
+    if (!lastTouchOf(l) || l.status === "Commission Paid" || l.status === "PTO" || l.status === "Not Moving Forward") return false;
+    const d = daysBetween(lastTouchOf(l), today_d.toISOString().split("T")[0]);
     return d !== null && d >= FOLLOWUP_DAYS;
-  }).sort((a,b) => daysBetween(a.dateAdded, today_d.toISOString().split("T")[0]) - daysBetween(b.dateAdded, today_d.toISOString().split("T")[0])).reverse().slice(0,5);
+  }).sort((a,b) => daysBetween(lastTouchOf(a), today_d.toISOString().split("T")[0]) - daysBetween(lastTouchOf(b), today_d.toISOString().split("T")[0])).reverse().slice(0,5);
 
   const el = document.getElementById("reminders-section");
   if (!stale.length) { el.innerHTML=""; return; }
@@ -651,7 +651,7 @@ function renderReminders() {
     <div class="reminder-banner">
       <div class="reminder-title">Follow-Up Needed (${stale.length})</div>
       ${stale.map(l => {
-        const d = daysBetween(l.dateAdded, today_d.toISOString().split("T")[0]);
+        const d = daysBetween(lastTouchOf(l), today_d.toISOString().split("T")[0]);
         const color = STATUS_COLORS[l.status]||"#888";
         return `<div class="reminder-item">
           <div>
@@ -717,7 +717,7 @@ function renderLeadsTable() {
   // Desktop table
   const tbody = document.getElementById("leads-tbody");
   if (!filtered.length) {
-    tbody.innerHTML='<tr><td colspan="11" class="empty">No leads match your filters.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="12" class="empty">No leads match your filters.</td></tr>';
   } else {
     tbody.innerHTML = filtered.map(l => {
       const dtc = daysBetween(l.dateAdded,l.dateClosed);
@@ -733,6 +733,7 @@ function renderLeadsTable() {
         <td class="muted" style="font-size:11px">${cleanDate(l.dateAdded)||"—"}</td>
         <td class="muted" style="font-size:11px">${cleanDate(l.dateClosed)||"—"}</td>
         <td class="mono" style="font-size:11px">${dtc!==null?dtc+"d":"—"}</td>
+        <td>${l.lastAutoTouch ? cleanDate(l.lastAutoTouch) : "—"}</td>
         <td><div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
@@ -850,7 +851,22 @@ function cleanDate(raw) {
   if (isNaN(d.getTime())) return raw;
   return d.toISOString().split("T")[0];
 }
-function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
+
+    // __LT_HELPER__ (last-touch + auto-touch helper)
+    function lastTouchOf(l){
+      if (!l) return "1970-01-01";
+      var ts=[];
+      function add(v){ if (!v) return; var d=new Date(v); if (!isNaN(d)) ts.push(d.getTime()); }
+      add(l.dateAdded); add(l.lastAutoTouch);
+      if (l.notes){
+        var s=String(l.notes);
+        var m=(s.match(/\d{4}-\d{2}-\d{2}/g)||[]).concat(s.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/g)||[]);
+        m.forEach(function(x){ var d=new Date(x); if (!isNaN(d)) ts.push(d.getTime()); });
+      }
+      if (ts.length===0) return l.dateAdded||"1970-01-01";
+      return new Date(Math.max.apply(null, ts)).toISOString().slice(0,10);
+    }
+    function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
 function fmt$(n) { return n ? "$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0}) : "—"; }
 </script>
 </body>
