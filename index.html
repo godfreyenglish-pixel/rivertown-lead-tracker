@@ -573,7 +573,7 @@ function renderArchive() {
     const noteEntries = parseNotes(l.notes||"");
     const lastNote = noteEntries.length ? noteEntries[0].text.slice(0,60)+(noteEntries[0].text.length>60?"...":"") : "—";
     return `<tr style="opacity:0.7">
-      <td style="font-weight:600">${l.name||"—"}</td>
+      <td style="font-weight:600">${l.name||"—"}${telIcon(l.phone, l.name)}</td>
       <td class="muted">${l.source||"—"}</td>
       <td class="muted" style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.address||"—"}</td>
       <td class="mono">${fmt$(l.dealValue)}</td>
@@ -660,7 +660,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-            <button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+            ${l.phone ? `<a href="tel:+${String(l.phone).replace(/\\D+/g,"").replace(/^(\\d{10})$/,"1$1")}" class="btn btn-ghost btn-sm" style="margin-right:4px;color:#d85830;" title="Call ${l.name}">\u{1F4DE}</a>` : ""}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -756,7 +756,7 @@ function renderLeadsTable() {
         </div>
         <span class="badge" style="background:${color}22;color:${color}">${l.status}</span>
       </div>
-      ${l.phone ? `<div class="lead-card-row"><span>Phone</span><span>${l.phone}</span></div>` : ""}
+      ${l.phone ? `<div class="lead-card-row"><span>Phone</span><span>${telLink(l.phone)}</span></div>` : ""}
       ${l.address ? `<div class="lead-card-row"><span>Address</span><span style="text-align:right;max-width:200px">${l.address}</span></div>` : ""}
       ${l.dealValue ? `<div class="lead-card-row"><span>Deal Value</span><span>${fmt$(l.dealValue)}</span></div>` : ""}
       ${l.commissionAmount ? `<div class="lead-card-row"><span>Commission</span><span style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</span></div>` : ""}
@@ -851,6 +851,23 @@ function cleanDate(raw) {
   if (isNaN(d.getTime())) return raw;
   return d.toISOString().split("T")[0];
 }
+
+    
+    // __CLICK_TO_CALL__ phone link helper
+    function telLink(phone, label){
+      if (!phone) return label || "";
+      var digits = String(phone).replace(/\D+/g, "");
+      if (digits.length === 10) digits = "1" + digits;
+      var href = "tel:+" + digits;
+      var display = label || phone;
+      return '<a href="' + href + '" style="color:#d85830;text-decoration:none;white-space:nowrap;" title="Call ' + display + '">\u{1F4DE} ' + display + '</a>';
+    }
+    function telIcon(phone, name){
+      if (!phone) return "";
+      var digits = String(phone).replace(/\D+/g, "");
+      if (digits.length === 10) digits = "1" + digits;
+      return '<a href="tel:+' + digits + '" style="color:#d85830;text-decoration:none;margin-left:6px;font-size:14px;" title="Call ' + (name||"") + '">\u{1F4DE}</a>';
+    }
 
     // __LT_HELPER__ (last-touch + auto-touch helper)
     function lastTouchOf(l){
