@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rivertown Solar — Lead Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; font-size: 14px; }
+  :root {
+    --accent: #EF9F27; --accent-text: #412402; --accent-light: #faeeda;
+    --green: #0F6E56; --blue: #378ADD; --red: #E24B4A; --orange: #D85A30;
+    --bg: #f5f5f0; --surface: #ffffff; --surface2: #f8f7f3;
+    --border: rgba(0,0,0,0.1); --text: #1a1a1a; --text2: #666; --text3: #999;
+    --radius: 10px; --radius-sm: 6px;
+  }
+
+  .app { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo svg { width: 18px; height: 18px; }
+  .brand-sub { font-size: 10px; font-weight: 600; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase; }
+  .brand-name { font-size: 18px; font-weight: 600; color: var(--text); }
+  .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .conn-status { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; }
+  .conn-ok { background: #e8f5e9; color: #2e7d32; }
+  .conn-err { background: #fdecea; color: #c62828; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: color 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .card-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
+
+  .stat { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .stat-value { font-size: 22px; font-weight: 600; font-family: 'SF Mono','Fira Code',monospace; color: var(--text); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green { color: var(--green); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; max-width: 640px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; background: var(--surface); color: var(--text); outline: none; font-family: inherit; transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field input[readonly] { background: var(--surface2); color: var(--text2); }
+  .field textarea { resize: vertical; }
+  .field-full { grid-column: 1/-1; }
+
+  .btn { padding: 9px 22px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .btn-primary { background: var(--accent); color: var(--accent-text); }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-ghost { background: none; border: 0.5px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover { background: var(--surface2); }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-danger { color: var(--red); }
+
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 10px; font-size: 12px; border-bottom: 0.5px solid var(--border); }
+  tr:hover td { background: var(--surface2); }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+  .muted { color: var(--text2); }
+
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filters input, .filters select { padding: 7px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; background: var(--surface); color: var(--text); outline: none; }
+  .filters input { flex: 1; min-width: 140px; }
+  .count-badge { font-size: 11px; color: var(--text2); margin-left: auto; }
+
+  .edit-panel { background: var(--surface); border: 0.5px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+  .edit-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .edit-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0 16px; }
+
+  .setup { max-width: 500px; margin: 40px auto; padding: 0 16px; }
+  .setup-steps { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+  .step { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+  .step-num { min-width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; flex-shrink: 0; }
+  .step-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  .alert { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 12px; }
+  .alert-ok { background: #e8f5e9; color: #2e7d32; }
+  .alert-err { background: #fdecea; color: #c62828; }
+  .alert-warn { background: #fff8e1; color: #e65100; }
+
+  .progress-wrap { display: flex; align-items: center; gap: 8px; }
+  .progress-bar { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+
+  .analytics-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .analytics-table th { text-align: left; padding: 7px 10px; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); }
+  .analytics-table td { padding: 10px 10px; border-bottom: 0.5px solid var(--border); }
+
+  .empty { text-align: center; padding: 2.5rem; color: var(--text2); font-size: 13px; }
+
+  /* ── Reminders banner ── */
+  .reminder-banner { background: #fff8e1; border: 0.5px solid #ffe082; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
+  .reminder-title { font-size: 11px; font-weight: 700; color: #e65100; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .reminder-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid #ffe082; font-size: 12px; flex-wrap: wrap; gap: 6px; }
+  .reminder-item:last-child { border-bottom: none; }
+  .reminder-name { font-weight: 600; }
+  .reminder-meta { color: var(--text2); font-size: 11px; }
+  .reminder-days { font-size: 11px; font-weight: 700; color: var(--orange); background: #fff3e0; padding: 2px 8px; border-radius: 10px; }
+
+  /* ── Notes history ── */
+  .notes-history { margin-top: 12px; }
+  .note-entry { display: flex; gap: 10px; margin-bottom: 10px; }
+  .note-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+  .note-body { flex: 1; }
+  .note-date { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .note-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .note-add { display: flex; gap: 8px; margin-top: 12px; }
+  .note-add textarea { flex: 1; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; resize: none; outline: none; }
+  .note-add textarea:focus { border-color: var(--accent); }
+
+  /* ── Mobile lead cards ── */
+  .lead-cards { display: none; }
+  .lead-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+  .lead-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .lead-card-name { font-weight: 600; font-size: 14px; }
+  .lead-card-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text2); }
+  .lead-card-row span:last-child { color: var(--text); font-weight: 500; }
+  .lead-card-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+  /* ── Reports tab ── */
+  .report-table { width: 100%; border-collapse: collapse; }
+  .report-table th { text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 0.5px solid var(--border); }
+  .report-table td { padding: 11px 12px; font-size: 13px; border-bottom: 0.5px solid var(--border); }
+  .report-table tr:last-child td { border-bottom: none; font-weight: 700; background: var(--surface2); }
+  .report-month-label { font-weight: 600; }
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 640px) {
+    .app { padding: 12px 12px; }
+    .grid-6 { grid-template-columns: repeat(2,1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .edit-grid { grid-template-columns: 1fr 1fr; }
+    .brand-name { font-size: 15px; }
+    .header-right .btn { padding: 4px 8px; font-size: 11px; }
+    .stat-value { font-size: 18px; }
+    .table-wrap table { display: none; }
+    .lead-cards { display: block; }
+    .tabs .tab { padding: 8px 12px; font-size: 12px; }
+    .card { padding: 12px 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Setup -->
+  <div id="setup-screen" style="display:none">
+    <div class="setup">
+      <div class="header-left" style="margin-bottom:24px">
+        <div class="logo"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="4" fill="#412402"/><line x1="9" y1="1" x2="9" y2="3.5" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="14.5" x2="9" y2="17" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="9" x2="3.5" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="14.5" y1="9" x2="17" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div><div class="brand-sub">Rivertown Solar</div><div class="brand-name">Lead Tracker Setup</div></div>
+      </div>
+      <div class="setup-steps">
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:12px">One-Time Setup</p>
+        <div class="step"><div class="step-num">1</div><div class="step-text">Create a new Google Sheet</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Go to Extensions → Apps Script</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Paste the Apps Script v4 code and save</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-text">Copy the Web App URL and paste below</div></div>
+      </div>
+      <div class="field"><label>Apps Script Web App URL</label><input id="setup-url" type="url" placeholder="https://script.google.com/macros/s/..." style="font-family:monospace;font-size:12px"></div>
+      <div id="setup-alert"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="connectSheet()">Connect Sheet</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main-screen" style="display:none">
+    <div class="header">
+      <div class="header-left">
+        <div class="logo"><svg viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="4" fill="#412402"/><line x1="9" y1="1" x2="9" y2="3.5" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="14.5" x2="9" y2="17" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="9" x2="3.5" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/><line x1="14.5" y1="9" x2="17" y2="9" stroke="#412402" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div><div class="brand-sub">Rivertown Solar</div><div class="brand-name">Lead Tracker</div></div>
+      </div>
+      <div class="header-right">
+        <span id="conn-badge" class="conn-status conn-ok">Connected</span>
+        <button class="btn btn-ghost btn-sm" onclick="syncData()">Sync</button>
+        <button class="btn btn-ghost btn-sm" onclick="disconnect()">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('overview',this)">Overview</button>
+      <button class="tab" onclick="showTab('add',this)">Add Lead</button>
+<button class="tab" id="hot-tab-btn" onclick="showTab('hot',this)">Hot Leads (0)</button>
+      <button class="tab" id="leads-tab-btn" onclick="showTab('leads',this)">Leads (0)</button>
+      <button class="tab" onclick="showTab('reports',this)">Reports</button>
+      <button class="tab" onclick="showTab('analytics',this)">Analytics</button>
+      <button class="tab" id="archive-tab-btn" onclick="showTab('archive',this)">Archive (0)</button>
+    </div>
+
+    <!-- Overview -->
+    <div id="tab-overview" class="tab-content active">
+      <div id="reminders-section"></div>
+      <div class="grid-6" id="stats-grid"></div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card"><div class="card-label">Pipeline by Status</div><div style="position:relative;height:200px"><canvas id="statusChart"></canvas></div></div>
+        <div class="card"><div class="card-label">Monthly Lead Volume</div><div style="position:relative;height:200px"><canvas id="monthlyChart"></canvas></div></div>
+      </div>
+      <div class="card"><div class="card-label">Leads by Source</div><div style="position:relative;height:150px"><canvas id="sourceChart"></canvas></div></div>
+    </div>
+
+    <!-- Add Lead -->
+    <div id="tab-add" class="tab-content">
+      <div class="form-grid">
+        <div class="field"><label>Lead Name *</label><input id="f-name" type="text" placeholder="John Smith"></div>
+        <div class="field"><label>Phone</label><input id="f-phone" type="tel" placeholder="(555) 000-0000"></div>
+        <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="john@email.com"></div>
+        <div class="field"><label>Address</label><input id="f-address" type="text" placeholder="123 Main St, Jamaica NY 11434"></div>
+        <div class="field"><label>Source</label><select id="f-source"><option>Social Media</option><option>Company Lead</option><option>Website</option><option>SEO</option><option>Referral</option><option>Other</option></select></div>
+        <div class="field"><label>Status</label><select id="f-status"><option>New</option><option>Contacted</option><option>Proposal Sent</option><option>Contract Signed</option><option>Permitted</option><option>Installed</option><option>PTO</option><option>Commission Paid</option></select></div>
+        <div class="field"><label>Date Added</label><input id="f-dateAdded" type="date"></div>
+        <div class="field"><label>System Size (kW)</label><input id="f-systemSize" type="number" step="0.1" placeholder="8.5"></div>
+        <div class="field"><label>Deal Value ($)</label><input id="f-dealValue" type="number" placeholder="35000" oninput="calcComm()"></div>
+        <div class="field"><label>Commission %</label><input id="f-commissionPct" type="number" step="0.1" placeholder="5" oninput="calcComm()"></div>
+        <div class="field"><label>Commission Amount</label><input id="f-commissionAmount" readonly placeholder="Auto-calculated"></div>
+        <div class="field"><label>Date Closed</label><input id="f-dateClosed" type="date"></div>
+        <div class="field"><label>Date Installed</label><input id="f-dateInstalled" type="date"></div>
+        <div class="field"><label>Date PTO</label><input id="f-datePTO" type="date"></div>
+        <div class="field"><label>Date Commission Paid</label><input id="f-dateCommissionPaid" type="date"></div>
+        <div class="field field-full"><label>Notes</label><textarea id="f-notes" rows="2" placeholder="Roof type, utility info, urgency..."></textarea></div>
+      </div>
+      <div id="add-alert"></div>
+      <button class="btn btn-primary" onclick="addLead()">Add Lead</button>
+    </div>
+
+    <!-- Leads -->
+
+<div id="tab-hot" class="tab-content">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="margin:0;font-size:20px;color:#2b2b2b;">Hot Active Leads</h2>
+    <span class="muted" id="hot-count-label" style="font-size:13px;"></span>
+  </div>
+  <div id="hot-leads-body"></div>
+</div>
+
+    <div id="tab-leads" class="tab-content">
+      <div class="filters">
+        <input id="search" type="text" placeholder="Search leads..." oninput="renderLeadsTable()">
+        <select id="filter-source" onchange="renderLeadsTable()">
+          <option value="">All Sources</option>
+          <option>Social Media</option><option>Company Lead</option><option>Website</option><option>SEO</option><option>Referral</option><option>Other</option>
+        </select>
+        <select id="filter-status" onchange="renderLeadsTable()">
+          <option value="">All Statuses</option>
+          <option>New</option><option>Contacted</option><option>Proposal Sent</option><option>Contract Signed</option><option>Permitted</option><option>Installed</option><option>PTO</option><option>Commission Paid</option>
+        </select>
+        <span class="count-badge" id="lead-count">0 leads</span>
+      </div>
+      <div id="edit-panel" style="display:none" class="edit-panel"></div>
+      <!-- Desktop table -->
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Name</th><th>Source</th><th>Status</th><th>Address</th><th>Size</th><th>Value</th><th>Commission</th><th>Added</th><th>Closed</th><th>Days</th><th>Last Touch</th><th></th>
+        </tr></thead><tbody id="leads-tbody"></tbody></table>
+      </div>
+      <!-- Mobile cards -->
+      <div class="lead-cards" id="lead-cards-mobile"></div>
+    </div>
+
+    <!-- Reports -->
+    <div id="tab-reports" class="tab-content">
+      <div class="grid-3" style="margin-bottom:18px" id="report-stats"></div>
+      <div class="card">
+        <div class="card-label">Monthly Commission Report</div>
+        <div class="table-wrap"><table class="report-table" id="report-table"></table></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-label">Monthly Commission Chart</div>
+        <div style="position:relative;height:220px"><canvas id="commChart"></canvas></div>
+      </div>
+    </div>
+
+
+    <!-- Archive -->
+    <div id="tab-archive" class="tab-content">
+      <div style="background:#f8f7f3;border:0.5px solid rgba(0,0,0,0.1);border-radius:10px;padding:14px 18px;margin-bottom:16px;">
+        <p style="font-size:12px;color:#666;margin:0">Leads marked <strong>Not Moving Forward</strong> are automatically moved here. They are excluded from your pipeline, follow-up reminders, and reports.</p>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Name</th><th>Source</th><th>Address</th><th>Value</th><th>Added</th><th>Notes</th><th></th>
+        </tr></thead><tbody id="archive-tbody"></tbody></table>
+      </div>
+      <div class="lead-cards" id="archive-cards-mobile"></div>
+    </div>
+
+    <!-- Analytics -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card"><div class="card-label">Avg Days to Close by Source</div><div style="position:relative;height:190px"><canvas id="closeTimeChart"></canvas></div></div>
+        <div class="card"><div class="card-label">Avg Days to Install by Source</div><div style="position:relative;height:190px"><canvas id="installTimeChart"></canvas></div></div>
+      </div>
+      <div class="card"><div class="card-label">Source Performance</div><div class="table-wrap"><table class="analytics-table" id="perf-table"></table></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SOURCES = ["Social Media","Company Lead","Website","SEO","Referral","Other"];
+const STATUSES = ["New","Contacted","Proposal Sent","Contract Signed","Permitted","Installed","PTO","Commission Paid","Not Moving Forward"];
+const STATUS_COLORS = { "New":"#888780","Contacted":"#378ADD","Proposal Sent":"#EF9F27","Contract Signed":"#639922","Permitted":"#1D9E75","Installed":"#534AB7","PTO":"#D85A30","Commission Paid":"#0F6E56","Not Moving Forward":"#888780" };
+const SRC_COLORS = ["#378ADD","#EF9F27","#639922","#534AB7","#D85A30","#888780"];
+const FOLLOWUP_DAYS = 7;
+
+let leads = [], scriptUrl = "", charts = {};
+
+// ── Storage ──────────────────────────────────────────────────
+function saveUrl(u) { try { localStorage.setItem("rt_url",u); } catch(e){} }
+function loadUrl() { try { return localStorage.getItem("rt_url")||""; } catch(e){ return ""; } }
+function clearUrl() { try { localStorage.removeItem("rt_url"); } catch(e){} }
+
+// ── Init ─────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  const u = loadUrl();
+  if (u) { scriptUrl = u; showMain(); fetchLeads(); }
+  else showSetup();
+  document.getElementById("f-dateAdded").value = today();
+});
+
+function showSetup() { document.getElementById("setup-screen").style.display="block"; document.getElementById("main-screen").style.display="none"; }
+function showMain() { document.getElementById("setup-screen").style.display="none"; document.getElementById("main-screen").style.display="block"; }
+function disconnect() { clearUrl(); scriptUrl=""; leads=[]; showSetup(); }
+
+// ── JSONP ────────────────────────────────────────────────────
+function jsonpCall(url) {
+  return new Promise((resolve,reject) => {
+    const cb = "rt_"+Date.now()+"_"+Math.floor(Math.random()*9999);
+    const script = document.createElement("script");
+    const timer = setTimeout(() => { cleanup(); reject(new Error("Request timed out.")); }, 20000);
+    function cleanup() { clearTimeout(timer); delete window[cb]; if (script.parentNode) script.parentNode.removeChild(script); }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error("Failed to reach Apps Script.")); };
+    script.src = url + "&callback=" + cb;
+    document.head.appendChild(script);
+  });
+}
+
+async function apiCall(action, data) {
+  let u = scriptUrl + "?action=" + action;
+  if (action === "delete" && data) u += "&id=" + encodeURIComponent(data.id);
+  else if (data) u += "&data=" + encodeURIComponent(JSON.stringify(data));
+  return jsonpCall(u);
+}
+
+// ── Connect ──────────────────────────────────────────────────
+async function connectSheet() {
+  const url = document.getElementById("setup-url").value.trim();
+  const al = document.getElementById("setup-alert");
+  if (!url.includes("script.google.com")) { al.innerHTML='<div class="alert alert-err">Doesn\'t look like a valid Apps Script URL.</div>'; return; }
+  scriptUrl = url;
+  al.innerHTML='<div class="alert alert-warn">Connecting...</div>';
+  try {
+    const res = await apiCall("get");
+    if (res.success) { saveUrl(url); leads=res.data||[]; showMain(); renderAll(); }
+    else al.innerHTML='<div class="alert alert-err">'+(res.error||"Error")+'</div>';
+  } catch(e) { al.innerHTML='<div class="alert alert-err">'+e.message+'</div>'; }
+}
+
+// ── Sync ─────────────────────────────────────────────────────
+async function fetchLeads() {
+  setBadge(false,"Syncing...");
+  try {
+    const res = await apiCall("get");
+    if (res.success) { leads=res.data||[]; renderAll(); setBadge(true); }
+    else setBadge(false,"Error");
+  } catch(e) { setBadge(false,"Connection error"); }
+}
+function syncData() { fetchLeads(); }
+function setBadge(ok,msg) {
+  const b = document.getElementById("conn-badge");
+  b.className = "conn-status " + (ok ? "conn-ok" : "conn-err");
+  b.textContent = ok ? "Connected" : (msg||"Error");
+}
+
+// ── Notes helpers ────────────────────────────────────────────
+function parseNotes(raw) {
+  if (!raw) return [];
+  const entries = [];
+  const lines = raw.split("\n");
+  let currentEntry = null;
+  for (const line of lines) {
+    const match = line.match(/^\[(\d{4}-\d{2}-\d{2})\] (.+)/);
+    if (match) {
+      if (currentEntry) entries.push(currentEntry);
+      currentEntry = { date: match[1], text: match[2] };
+    } else if (currentEntry && line.trim()) {
+      currentEntry.text += "\n" + line;
+    } else if (!currentEntry && line.trim()) {
+      entries.push({ date: "", text: line });
+    }
+  }
+  if (currentEntry) entries.push(currentEntry);
+  return entries;
+}
+
+function formatNotes(entries) {
+  return entries.map(e => e.date ? `[${e.date}] ${e.text}` : e.text).join("\n");
+}
+
+function prependNote(existing, newText) {
+  const d = today();
+  const newEntry = `[${d}] ${newText.trim()}`;
+  return existing ? newEntry + "\n" + existing : newEntry;
+}
+
+// ── Add Lead ─────────────────────────────────────────────────
+function calcComm() {
+  const dv = parseFloat(document.getElementById("f-dealValue").value)||0;
+  const cp = parseFloat(document.getElementById("f-commissionPct").value)||0;
+  document.getElementById("f-commissionAmount").value = dv&&cp ? "$"+Math.round(dv*cp/100).toLocaleString() : "";
+}
+
+async function addLead() {
+  const al = document.getElementById("add-alert");
+  const name = document.getElementById("f-name").value.trim();
+  if (!name) { al.innerHTML='<div class="alert alert-err">Lead name is required.</div>'; return; }
+  const notesRaw = document.getElementById("f-notes").value.trim();
+  const notes = notesRaw ? prependNote("", notesRaw) : "";
+  const data = {
+    name, email: v("f-email"), phone: v("f-phone"), address: v("f-address"),
+    source: v("f-source"), status: v("f-status"), dateAdded: v("f-dateAdded"),
+    systemSize: v("f-systemSize"), dealValue: v("f-dealValue"),
+    commissionPct: v("f-commissionPct"),
+    commissionAmount: v("f-commissionAmount").replace(/[$,]/g,""),
+    dateClosed: v("f-dateClosed"), dateInstalled: v("f-dateInstalled"),
+    datePTO: v("f-datePTO"), dateCommissionPaid: v("f-dateCommissionPaid"), notes
+  };
+  al.innerHTML='<div class="alert alert-warn">Saving...</div>';
+  try {
+    const res = await apiCall("add", data);
+    if (res.success) {
+      leads = res.data; renderAll(); clearAddForm();
+      al.innerHTML='<div class="alert alert-ok">Lead added.</div>';
+      setTimeout(() => al.innerHTML="", 3000);
+    } else al.innerHTML='<div class="alert alert-err">'+(res.error||"Failed.")+'</div>';
+  } catch(e) { al.innerHTML='<div class="alert alert-err">'+e.message+'</div>'; }
+}
+
+function v(id) { return document.getElementById(id)?.value||""; }
+
+function clearAddForm() {
+  ["f-name","f-email","f-phone","f-address","f-systemSize","f-dealValue","f-commissionPct","f-commissionAmount","f-dateClosed","f-dateInstalled","f-datePTO","f-dateCommissionPaid","f-notes"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+  document.getElementById("f-source").value="Social Media";
+  document.getElementById("f-status").value="New";
+  document.getElementById("f-dateAdded").value=today();
+}
+
+// ── Edit Lead ────────────────────────────────────────────────
+function openEdit(lead) {
+  const panel = document.getElementById("edit-panel");
+  panel.style.display = "block";
+  const sOpts = STATUSES.map(s=>`<option ${s===lead.status?"selected":""}>${s}</option>`).join("");
+  const srcOpts = SOURCES.map(s=>`<option ${s===lead.source?"selected":""}>${s}</option>`).join("");
+  const noteEntries = parseNotes(lead.notes||"");
+  const notesHtml = noteEntries.length ? noteEntries.map(e=>`
+    <div class="note-entry">
+      <div class="note-dot"></div>
+      <div class="note-body">
+        ${e.date ? `<div class="note-date">${e.date}</div>` : ""}
+        <div class="note-text">${e.text.replace(/\n/g,"<br>")}</div>
+      </div>
+    </div>`).join("") : '<p style="font-size:12px;color:var(--text3);padding:8px 0">No notes yet.</p>';
+
+  panel.innerHTML = `
+    <div class="edit-header">
+      <span style="font-size:14px;font-weight:600">Edit: ${lead.name}</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeEdit()">Close</button>
+    </div>
+    <div class="edit-grid">
+      ${ef("Lead Name","e-name","text",lead.name)}
+      ${ef("Phone","e-phone","tel",lead.phone)}
+      ${ef("Email","e-email","email",lead.email)}
+      ${ef("Address","e-address","text",lead.address)}
+      <div class="field"><label>Source</label><select id="e-source">${srcOpts}</select></div>
+      <div class="field"><label>Status</label><select id="e-status">${sOpts}</select></div>
+      ${ef("System Size (kW)","e-systemSize","number",lead.systemSize)}
+      ${ef("Deal Value ($)","e-dealValue","number",lead.dealValue)}
+      ${ef("Commission %","e-commissionPct","number",lead.commissionPct)}
+      ${ef("Commission Amount ($)","e-commissionAmount","number",lead.commissionAmount)}
+      ${ef("Date Added","e-dateAdded","date",lead.dateAdded)}
+      ${ef("Date Closed","e-dateClosed","date",lead.dateClosed)}
+      ${ef("Date Installed","e-dateInstalled","date",lead.dateInstalled)}
+      ${ef("Date PTO","e-datePTO","date",lead.datePTO)}
+      ${ef("Date Commission Paid","e-dateCommissionPaid","date",lead.dateCommissionPaid)}
+    </div>
+    <div style="margin-top:8px">
+      <div class="card-label" style="margin-bottom:8px">Notes History</div>
+      <div class="notes-history">${notesHtml}</div>
+      <div class="note-add">
+        <textarea id="new-note-text" rows="2" placeholder="Add a new note..."></textarea>
+        <button class="btn btn-primary btn-sm" style="align-self:flex-end;white-space:nowrap" onclick="addNote('${lead.id}')">Add Note</button>
+      </div>
+    </div>
+    <div id="edit-alert" style="margin-top:10px"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="saveLead('${lead.id}')">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+  `;
+  panel.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+function ef(label,id,type,val) {
+  const cleaned = type === "date" ? (cleanDate(val)||"") : (val||"");
+  return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${cleaned}"></div>`;
+}
+function closeEdit() { document.getElementById("edit-panel").style.display="none"; }
+
+async function addNote(leadId) {
+  const newText = document.getElementById("new-note-text").value.trim();
+  if (!newText) return;
+  const lead = leads.find(l => l.id === leadId);
+  if (!lead) return;
+  const updatedNotes = prependNote(lead.notes || "", newText);
+  const updated = { ...lead, notes: updatedNotes };
+  try {
+    const res = await apiCall("update", updated);
+    if (res.success) { leads = res.data; openEdit(leads.find(l=>l.id===leadId)||updated); renderAll(); }
+  } catch(e) { alert("Error saving note: "+e.message); }
+}
+
+async function saveLead(id) {
+  const al = document.getElementById("edit-alert");
+  const lead = {
+    id, name: v("e-name"), email: v("e-email"), phone: v("e-phone"), address: v("e-address"),
+    source: v("e-source"), status: v("e-status"), systemSize: v("e-systemSize"),
+    dealValue: v("e-dealValue"), commissionPct: v("e-commissionPct"), commissionAmount: v("e-commissionAmount"),
+    dateAdded: v("e-dateAdded"), dateClosed: v("e-dateClosed"), dateInstalled: v("e-dateInstalled"),
+    datePTO: v("e-datePTO"), dateCommissionPaid: v("e-dateCommissionPaid"),
+    notes: leads.find(l=>l.id===id)?.notes || ""
+  };
+  al.innerHTML='<div class="alert alert-warn">Saving...</div>';
+  try {
+    const res = await apiCall("update", lead);
+    if (res.success) { leads=res.data; renderAll(); closeEdit(); }
+    else al.innerHTML='<div class="alert alert-err">'+(res.error||"Failed.")+'</div>';
+  } catch(e) { al.innerHTML='<div class="alert alert-err">'+e.message+'</div>'; }
+}
+
+async function deleteLead(id, name) {
+  if (!confirm("Delete "+name+"?")) return;
+  try {
+    const res = await apiCall("delete",{id});
+    if (res.success) { leads=res.data; renderAll(); closeEdit(); }
+  } catch(e) { alert("Error: "+e.message); }
+}
+
+
+// ── Archive ───────────────────────────────────────────────────
+function renderArchive() {
+  const archived = leads.filter(l => l.status === "Not Moving Forward");
+  const tbody = document.getElementById("archive-tbody");
+  const cards = document.getElementById("archive-cards-mobile");
+
+  if (!archived.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No archived leads yet.</td></tr>';
+    if (cards) cards.innerHTML = '<div class="empty">No archived leads yet.</div>';
+    return;
+  }
+
+  tbody.innerHTML = archived.map(l => {
+    const noteEntries = parseNotes(l.notes||"");
+    const lastNote = noteEntries.length ? noteEntries[0].text.slice(0,60)+(noteEntries[0].text.length>60?"...":"") : "—";
+    return `<tr style="opacity:0.7">
+      <td style="font-weight:600">${l.name||"—"}</td>
+      <td class="muted">${l.source||"—"}</td>
+      <td class="muted" style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.address||"—"}</td>
+      <td class="mono">${fmt$(l.dealValue)}</td>
+      <td class="muted" style="font-size:11px">${cleanDate(l.dateAdded)||"—"}</td>
+      <td class="muted" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastNote}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="openEditById('${l.id}')" title="Restore or edit">Edit</button>
+        <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join("");
+
+  if (cards) {
+    cards.innerHTML = archived.map(l => `
+      <div class="lead-card" style="opacity:0.75;border-left:3px solid #888780">
+        <div class="lead-card-header">
+          <div>
+            <div class="lead-card-name">${l.name||"—"}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">${l.source||""} · ${cleanDate(l.dateAdded)||""}</div>
+          </div>
+          <span class="badge" style="background:#88878022;color:#888780">Not Moving Forward</span>
+        </div>
+        ${l.dealValue ? `<div class="lead-card-row"><span>Deal Value</span><span>${fmt$(l.dealValue)}</span></div>` : ""}
+        <div class="lead-card-actions">
+          <button class="btn btn-primary btn-sm" onclick="openEditById('${l.id}')">Edit / Restore</button>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
+        </div>
+      </div>`).join("");
+  }
+}
+
+// ── Render All ────────────────────────────────────────────────
+function renderAll() {
+  renderStats(); renderReminders(); renderCharts();
+  renderLeadsTable(); renderReports(); renderAnalytics(); renderArchive();
+  renderHotLeads(); renderReports(); renderAnalytics(); renderArchive();
+  const activeLeads = leads.filter(l => l.status !== "Not Moving Forward");
+  const archivedLeads = leads.filter(l => l.status === "Not Moving Forward");
+  document.getElementById("leads-tab-btn").textContent = "Leads ("+activeLeads.length+")";
+  document.getElementById("archive-tab-btn").textContent = "Archive ("+archivedLeads.length+")";
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function renderStats() {
+  const pipeline = leads.filter(l=>l.status!=="Commission Paid" && l.status!=="Not Moving Forward");
+  const closed = leads.filter(l=>l.status==="Commission Paid");
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const closedThisMonth = closed.filter(l=>(l.dateCommissionPaid||"").startsWith(thisMonth)).length;
+  const pipeVal = pipeline.reduce((s,l)=>s+(parseFloat(l.dealValue)||0),0);
+  const totalComm = closed.reduce((s,l)=>s+(parseFloat(l.commissionAmount)||0),0);
+  const times = closed.filter(l=>l.dateAdded&&l.dateClosed).map(l=>daysBetween(l.dateAdded,l.dateClosed)).filter(d=>d!==null);
+  const avgClose = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : null;
+  document.getElementById("stats-grid").innerHTML = `
+    <div class="stat"><div class="stat-label">Total Leads</div><div class="stat-value">${leads.length}</div></div>
+    <div class="stat"><div class="stat-label">Active Pipeline</div><div class="stat-value">${pipeline.length}</div></div>
+    <div class="stat"><div class="stat-label">Closed This Month</div><div class="stat-value">${closedThisMonth}</div></div>
+    <div class="stat"><div class="stat-label">Pipeline Value</div><div class="stat-value accent">${fmt$(pipeVal)}</div></div>
+    <div class="stat"><div class="stat-label">Total Commission</div><div class="stat-value green">${fmt$(totalComm)}</div></div>
+    <div class="stat"><div class="stat-label">Avg Days to Close</div><div class="stat-value">${avgClose!==null?avgClose+"d":"N/A"}</div></div>
+  `;
+}
+
+// ── Reminders ────────────────────────────────────────────────
+function renderReminders() {
+  const today_d = new Date();
+  const stale = leads.filter(l => {
+    if (!lastTouchOf(l) || l.status === "Commission Paid" || l.status === "PTO" || l.status === "Not Moving Forward") return false;
+    const d = daysBetween(lastTouchOf(l), today_d.toISOString().split("T")[0]);
+    return d !== null && d >= FOLLOWUP_DAYS;
+  }).sort((a,b) => daysBetween(lastTouchOf(a), today_d.toISOString().split("T")[0]) - daysBetween(lastTouchOf(b), today_d.toISOString().split("T")[0])).reverse().slice(0,5);
+
+  const el = document.getElementById("reminders-section");
+  if (!stale.length) { el.innerHTML=""; return; }
+
+  el.innerHTML = `
+    <div class="reminder-banner">
+      <div class="reminder-title">Follow-Up Needed (${stale.length})</div>
+      ${stale.map(l => {
+        const d = daysBetween(lastTouchOf(l), today_d.toISOString().split("T")[0]);
+        const color = STATUS_COLORS[l.status]||"#888";
+        return `<div class="reminder-item">
+          <div>
+            <div class="reminder-name">${l.name}</div>
+            <div class="reminder-meta">${l.source} · <span class="badge" style="background:${color}22;color:${color}">${l.status}</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="reminder-days">${d}d ago</span>
+${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function openEditById(id) {
+  const lead = leads.find(l=>l.id===id);
+  if (!lead) return;
+  showTab("leads", document.querySelector('.tab[onclick*="leads"]'));
+  setTimeout(() => openEdit(lead), 100);
+}
+
+// ── Charts ───────────────────────────────────────────────────
+function destroyChart(n) { if(charts[n]) { charts[n].destroy(); delete charts[n]; } }
+
+function renderCharts() {
+  destroyChart("status");
+  charts.status = new Chart(document.getElementById("statusChart"), {
+    type:"bar",
+    data:{ labels:STATUSES.map(s=>s.length>12?s.slice(0,12)+"…":s), datasets:[{ data:STATUSES.map(s=>leads.filter(l=>l.status===s).length), backgroundColor:STATUSES.map(s=>STATUS_COLORS[s]), borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:9}}},y:{ticks:{stepSize:1,font:{size:10}}}} }
+  });
+
+  destroyChart("monthly");
+  const months = Array.from({length:6},(_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-(5-i)); return {key:d.toISOString().slice(0,7),label:d.toLocaleString("default",{month:"short"})}; });
+  charts.monthly = new Chart(document.getElementById("monthlyChart"), {
+    type:"line",
+    data:{ labels:months.map(m=>m.label), datasets:[{ data:months.map(m=>leads.filter(l=>(l.dateAdded||"").startsWith(m.key)).length), borderColor:"#EF9F27", backgroundColor:"rgba(239,159,39,0.1)", fill:true, tension:0.3, pointBackgroundColor:"#EF9F27", pointRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:10}}},y:{ticks:{stepSize:1,font:{size:10}}}} }
+  });
+
+  destroyChart("source");
+  charts.source = new Chart(document.getElementById("sourceChart"), {
+    type:"bar",
+    data:{ labels:SOURCES, datasets:[{ data:SOURCES.map(s=>leads.filter(l=>l.source===s).length), backgroundColor:SRC_COLORS, borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:10}}},y:{ticks:{stepSize:1,font:{size:10}}}} }
+  });
+}
+
+// ── Leads Table + Mobile Cards ────────────────────────────────
+
+    function renderHotLeads(){
+      var hot = leads.filter(function(l){
+        return l.status && ["New","Contacted","Proposal Sent","Contract Signed","Permitted"].indexOf(l.status) !== -1;
+      }).sort(function(a,b){
+        var ta = lastTouchOf(a), tb = lastTouchOf(b);
+        return tb > ta ? 1 : tb < ta ? -1 : 0;
+      });
+      var btn = document.getElementById("hot-tab-btn");
+      if (btn) btn.textContent = "Hot Leads (" + hot.length + ")";
+      var el = document.getElementById("hot-leads-body");
+      var lbl = document.getElementById("hot-count-label");
+      if (lbl) lbl.textContent = hot.length + " active leads";
+      if (!el) return;
+      if (hot.length === 0) { el.innerHTML = "<p class=\"muted\">No active leads.</p>"; return; }
+      var html = hot.map(function(l){
+        var d = daysBetween(lastTouchOf(l), cleanDate(new Date()));
+        var dLabel = d === 0 ? "today" : d + "d ago";
+        var dColor = d > 5 ? "#c0392b" : d > 2 ? "#e67e22" : "#888880";
+        var digits = l.phone ? String(l.phone).replace(/[^0-9]/g, "") : "";
+        if (digits.length === 10) digits = "1" + digits;
+        var phoneBtn = digits ? '<a href="tel:+' + digits + '" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#d85830;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4DE} Call</a>' : '<span class="muted" style="font-size:12px;">No phone</span>';
+        var sBg = {"New":"#888880","Contacted":"#3498db","Proposal Sent":"#e67e22","Contract Signed":"#27ae60","Permitted":"#8e44ad"};
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e8e6e1;gap:12px;">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:600;font-size:15px;color:#2b2b2b;">' + (l.name||"\u2014") + '</div>' +
+            '<div style="font-size:12px;color:#888880;margin-top:2px;">' + (l.source||"") + ' \u00B7 <span style="background:' + (sBg[l.status]||"#888880") + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">' + l.status + '</span> \u00B7 <span style="color:' + dColor + '">' + dLabel + '</span></div>' +
+            (l.address ? '<div style="font-size:12px;color:#888880;margin-top:2px;">' + l.address + '</div>' : "") +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+            phoneBtn +
+            '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
+          '</div></div>';
+      }).join("");
+      el.innerHTML = '<div style="background:#fff;border:1px solid #e8e6e1;border-radius:10px;overflow:hidden;">' + html + '</div>';
+    }
+
+    function renderLeadsTable() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const src = document.getElementById("filter-source").value;
+  const status = document.getElementById("filter-status").value;
+  const activeLeads = leads.filter(l => l.status !== "Not Moving Forward");
+  const filtered = activeLeads.filter(l =>
+    (!search||(l.name||"").toLowerCase().includes(search)||(l.address||"").toLowerCase().includes(search)) &&
+    (!src||l.source===src) && (!status||l.status===status)
+  );
+  document.getElementById("lead-count").textContent = filtered.length+" leads";
+
+  // Desktop table
+  const tbody = document.getElementById("leads-tbody");
+  if (!filtered.length) {
+    tbody.innerHTML='<tr><td colspan="12" class="empty">No leads match your filters.</td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(l => {
+      const dtc = daysBetween(l.dateAdded,l.dateClosed);
+      const color = STATUS_COLORS[l.status]||"#888";
+      return `<tr>
+        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name||"—"}${telIcon(l.phone, l.name)}</td>
+        <td class="muted">${l.source||"—"}</td>
+        <td><span class="badge" style="background:${color}22;color:${color}">${l.status}</span></td>
+        <td class="muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${l.address||"—"}</td>
+        <td class="mono">${l.systemSize?l.systemSize+"kW":"—"}</td>
+        <td class="mono">${fmt$(l.dealValue)}</td>
+        <td class="mono" style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</td>
+        <td class="muted" style="font-size:11px">${cleanDate(l.dateAdded)||"—"}</td>
+        <td class="muted" style="font-size:11px">${cleanDate(l.dateClosed)||"—"}</td>
+        <td class="mono" style="font-size:11px">${dtc!==null?dtc+"d":"—"}</td>
+        <td>${l.lastAutoTouch ? cleanDate(l.lastAutoTouch) : "—"}</td>
+        <td><div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
+        </div></td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Mobile cards
+  const cards = document.getElementById("lead-cards-mobile");
+  if (!filtered.length) { cards.innerHTML='<div class="empty">No leads match your filters.</div>'; return; }
+  cards.innerHTML = filtered.map(l => {
+    const color = STATUS_COLORS[l.status]||"#888";
+    const dtc = daysBetween(l.dateAdded,l.dateClosed);
+    return `<div class="lead-card">
+      <div class="lead-card-header">
+        <div>
+          <div class="lead-card-name">${l.name||"—"}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${l.source||""} · ${cleanDate(l.dateAdded)||""}</div>
+        </div>
+        <span class="badge" style="background:${color}22;color:${color}">${l.status}</span>
+      </div>
+      ${l.phone ? `<div class="lead-card-row"><span>Phone</span><span>${telLink(l.phone)}</span></div>` : ""}
+      ${l.address ? `<div class="lead-card-row"><span>Address</span><span style="text-align:right;max-width:200px">${l.address}</span></div>` : ""}
+      ${l.dealValue ? `<div class="lead-card-row"><span>Deal Value</span><span>${fmt$(l.dealValue)}</span></div>` : ""}
+      ${l.commissionAmount ? `<div class="lead-card-row"><span>Commission</span><span style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</span></div>` : ""}
+      ${dtc!==null ? `<div class="lead-card-row"><span>Days to Close</span><span>${dtc}d</span></div>` : ""}
+      <div class="lead-card-actions">
+        <button class="btn btn-primary btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
+        <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── Reports ───────────────────────────────────────────────────
+function renderReports() {
+  const thisYear = new Date().getFullYear();
+  const months = Array.from({length:12},(_,i)=>{ const d=new Date(thisYear,i,1); return { key:`${thisYear}-${String(i+1).padStart(2,"0")}`, label:d.toLocaleString("default",{month:"long"}) }; });
+
+  const rows = months.map(m => {
+    const added = leads.filter(l=>(l.dateAdded||"").startsWith(m.key)).length;
+    const closed = leads.filter(l=>(l.dateClosed||"").startsWith(m.key)).length;
+    const comm = leads.filter(l=>(l.dateCommissionPaid||"").startsWith(m.key)).reduce((s,l)=>s+(parseFloat(l.commissionAmount)||0),0);
+    return { label:m.label, added, closed, comm:Math.round(comm) };
+  });
+
+  const totAdded = rows.reduce((s,r)=>s+r.added,0);
+  const totClosed = rows.reduce((s,r)=>s+r.closed,0);
+  const totComm = rows.reduce((s,r)=>s+r.comm,0);
+  const bestMonth = rows.reduce((best,r)=>r.comm>best.comm?r:best, {comm:0,label:"—"});
+
+  document.getElementById("report-stats").innerHTML = `
+    <div class="stat"><div class="stat-label">${thisYear} Leads Added</div><div class="stat-value">${totAdded}</div></div>
+    <div class="stat"><div class="stat-label">${thisYear} Deals Closed</div><div class="stat-value">${totClosed}</div></div>
+    <div class="stat"><div class="stat-label">${thisYear} Commission</div><div class="stat-value green">${fmt$(totComm)}</div></div>
+  `;
+
+  const tbl = document.getElementById("report-table");
+  tbl.innerHTML = `
+    <thead><tr><th>Month</th><th>Leads Added</th><th>Deals Closed</th><th>Commission Earned</th></tr></thead>
+    <tbody>
+      ${rows.map(r=>`<tr>
+        <td class="report-month-label">${r.label}</td>
+        <td class="mono">${r.added||"—"}</td>
+        <td class="mono">${r.closed||"—"}</td>
+        <td class="mono" style="color:${r.comm>0?"var(--green)":"var(--text2)"};font-weight:${r.comm>0?"600":"400"}">${r.comm>0?fmt$(r.comm):"—"}</td>
+      </tr>`).join("")}
+      <tr><td>Total ${thisYear}</td><td class="mono">${totAdded}</td><td class="mono">${totClosed}</td><td class="mono" style="color:var(--green)">${fmt$(totComm)}</td></tr>
+    </tbody>
+  `;
+
+  destroyChart("comm");
+  charts.comm = new Chart(document.getElementById("commChart"), {
+    type:"bar",
+    data:{ labels:rows.map(r=>r.label.slice(0,3)), datasets:[{ data:rows.map(r=>r.comm), backgroundColor:rows.map(r=>r.comm>0?"#0F6E56":"#e0e0da"), borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}, callback:v=>v>0?"$"+Math.round(v/1000)+"k":""}} } }
+  });
+}
+
+// ── Analytics ─────────────────────────────────────────────────
+function renderAnalytics() {
+  destroyChart("closeTime");
+  const closeData = SOURCES.map((s,i)=>{ const c=leads.filter(l=>l.source===s&&l.dateAdded&&l.dateClosed); if(!c.length) return null; return {s,avg:Math.round(c.reduce((a,l)=>a+daysBetween(l.dateAdded,l.dateClosed),0)/c.length),color:SRC_COLORS[i]}; }).filter(Boolean);
+  if (closeData.length) {
+    charts.closeTime = new Chart(document.getElementById("closeTimeChart"),{type:"bar",data:{labels:closeData.map(d=>d.s),datasets:[{data:closeData.map(d=>d.avg),backgroundColor:closeData.map(d=>d.color),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10}}}}}});
+  }
+  destroyChart("installTime");
+  const installData = SOURCES.map((s,i)=>{ const c=leads.filter(l=>l.source===s&&l.dateClosed&&l.dateInstalled); if(!c.length) return null; return {s,avg:Math.round(c.reduce((a,l)=>a+daysBetween(l.dateClosed,l.dateInstalled),0)/c.length),color:SRC_COLORS[i]}; }).filter(Boolean);
+  if (installData.length) {
+    charts.installTime = new Chart(document.getElementById("installTimeChart"),{type:"bar",data:{labels:installData.map(d=>d.s),datasets:[{data:installData.map(d=>d.avg),backgroundColor:installData.map(d=>d.color),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10}}}}}});
+  }
+  const perfData = SOURCES.map((s,i)=>{ const all=leads.filter(l=>l.source===s); if(!all.length) return null; const paid=all.filter(l=>l.status==="Commission Paid"); const tc=paid.reduce((a,l)=>a+(parseFloat(l.commissionAmount)||0),0); return {s,count:all.length,closed:paid.length,rate:Math.round((paid.length/all.length)*100),totalComm:Math.round(tc),commPerLead:all.length?Math.round(tc/all.length):0,color:SRC_COLORS[i]}; }).filter(Boolean);
+  const tbl = document.getElementById("perf-table");
+  if (!perfData.length) { tbl.innerHTML='<tr><td class="empty">Not enough data yet.</td></tr>'; return; }
+  tbl.innerHTML = `<thead><tr><th>Source</th><th>Leads</th><th>Closed</th><th>Close Rate</th><th>Total Commission</th><th>Commission / Lead</th></tr></thead><tbody>${perfData.map(d=>`<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${d.color};margin-right:8px;vertical-align:middle"></span>${d.s}</td><td class="mono">${d.count}</td><td class="mono">${d.closed}</td><td><div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${d.rate}%;background:${d.color}"></div></div><span class="mono" style="min-width:34px">${d.rate}%</span></div></td><td class="mono" style="color:var(--green);font-weight:600">${fmt$(d.totalComm)}</td><td class="mono">${fmt$(d.commPerLead)}</td></tr>`).join("")}</tbody>`;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll(".tab-content").forEach(el=>el.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(el=>el.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  if (btn) btn.classList.add("active");
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function today() { return new Date().toISOString().split("T")[0]; }
+function cleanDate(raw) {
+  if (!raw || raw === "—") return "";
+  // Already in yyyy-mm-dd format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // Full timestamp — parse and reformat
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toISOString().split("T")[0];
+}
+
+    
+    // __CLICK_TO_CALL__ phone link helper
+    function telLink(phone, label){
+      if (!phone) return label || "";
+      var digits = String(phone).replace(/\D+/g, "");
+      if (digits.length === 10) digits = "1" + digits;
+      var href = "tel:+" + digits;
+      var display = label || phone;
+      return '<a href="' + href + '" style="color:#d85830;text-decoration:none;white-space:nowrap;" title="Call ' + display + '">\u{1F4DE} ' + display + '</a>';
+    }
+    function telIcon(phone, name){
+      if (!phone) return "";
+      var digits = String(phone).replace(/\D+/g, "");
+      if (digits.length === 10) digits = "1" + digits;
+      return '<a href="tel:+' + digits + '" style="color:#d85830;text-decoration:none;margin-left:6px;font-size:14px;" title="Call ' + (name||"") + '">\u{1F4DE}</a>';
+    }
+
+    // __LT_HELPER__ (last-touch + auto-touch helper)
+    function lastTouchOf(l){
+      if (!l) return "1970-01-01";
+      var ts=[];
+      function add(v){ if (!v) return; var d=new Date(v); if (!isNaN(d)) ts.push(d.getTime()); }
+      add(l.dateAdded); add(l.lastAutoTouch);
+      if (l.notes){
+        var s=String(l.notes);
+        var m=(s.match(/\d{4}-\d{2}-\d{2}/g)||[]).concat(s.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/g)||[]);
+        m.forEach(function(x){ var d=new Date(x); if (!isNaN(d)) ts.push(d.getTime()); });
+      }
+      if (ts.length===0) return l.dateAdded||"1970-01-01";
+      return new Date(Math.max.apply(null, ts)).toISOString().slice(0,10);
+    }
+    function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
+function fmt$(n) { return n ? "$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0}) : "—"; }
+</script>
+</body>
+</html>
