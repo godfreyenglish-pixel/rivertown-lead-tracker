@@ -601,7 +601,7 @@ function renderArchive() {
       <div class="lead-card" style="opacity:0.75;border-left:3px solid #888780">
         <div class="lead-card-header">
           <div>
-            <div class="lead-card-name">${l.name||"—"}</div>
+            <div class="lead-card-name">${starBtn(l.id)}${l.name||"—"}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:2px">${l.source||""} · ${cleanDate(l.dateAdded)||""}</div>
           </div>
           <span class="badge" style="background:#88878022;color:#888780">Not Moving Forward</span>
@@ -671,7 +671,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -716,9 +716,9 @@ function renderCharts() {
 // ── Leads Table + Mobile Cards ────────────────────────────────
 
     function renderHotLeads(){
-      var hot = leads.filter(function(l){
-        return l.status && ["New","Contacted","Proposal Sent","Contract Signed","Permitted"].indexOf(l.status) !== -1;
-      }).sort(function(a,b){
+      var hotIds = getHotIds();
+      var hot = leads.filter(function(l){ return hotIds.indexOf(l.id) !== -1; });
+      hot.sort(function(a,b){
         var ta = lastTouchOf(a), tb = lastTouchOf(b);
         return tb > ta ? 1 : tb < ta ? -1 : 0;
       });
@@ -726,9 +726,9 @@ function renderCharts() {
       if (btn) btn.textContent = "Hot Leads (" + hot.length + ")";
       var el = document.getElementById("hot-leads-body");
       var lbl = document.getElementById("hot-count-label");
-      if (lbl) lbl.textContent = hot.length + " active leads";
+      if (lbl) lbl.textContent = hot.length + " starred leads";
       if (!el) return;
-      if (hot.length === 0) { el.innerHTML = "<p class=\"muted\">No active leads.</p>"; return; }
+      if (hot.length === 0) { el.innerHTML = "<p class=\"muted\" style=\"text-align:center;padding:40px 20px;\">No leads starred yet.<br><br>Tap the \u2606 star icon on any lead to add them here.</p>"; return; }
       var html = hot.map(function(l){
         var d = daysBetween(lastTouchOf(l), cleanDate(new Date()));
         var dLabel = d === 0 ? "today" : d + "d ago";
@@ -736,10 +736,10 @@ function renderCharts() {
         var digits = l.phone ? String(l.phone).replace(/[^0-9]/g, "") : "";
         if (digits.length === 10) digits = "1" + digits;
         var phoneBtn = digits ? '<a href="tel:+' + digits + '" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#d85830;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4DE} Call</a>' : '<span class="muted" style="font-size:12px;">No phone</span>';
-        var sBg = {"New":"#888880","Contacted":"#3498db","Proposal Sent":"#e67e22","Contract Signed":"#27ae60","Permitted":"#8e44ad"};
+        var sBg = {"New":"#888880","Contacted":"#3498db","Proposal Sent":"#e67e22","Contract Signed":"#27ae60","Permitted":"#8e44ad","Installed":"#2c3e50","PTO":"#16a085","Commission Paid":"#c0392b"};
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e8e6e1;gap:12px;">' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-weight:600;font-size:15px;color:#2b2b2b;">' + (l.name||"\u2014") + '</div>' +
+            '<div style="display:flex;align-items:center;font-weight:600;font-size:15px;color:#2b2b2b;">' + starBtn(l.id) + (l.name||"\u2014") + '</div>' +
             '<div style="font-size:12px;color:#888880;margin-top:2px;">' + (l.source||"") + ' \u00B7 <span style="background:' + (sBg[l.status]||"#888880") + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">' + l.status + '</span> \u00B7 <span style="color:' + dColor + '">' + dLabel + '</span></div>' +
             (l.address ? '<div style="font-size:12px;color:#888880;margin-top:2px;">' + l.address + '</div>' : "") +
           '</div>' +
@@ -771,7 +771,7 @@ function renderCharts() {
       const dtc = daysBetween(l.dateAdded,l.dateClosed);
       const color = STATUS_COLORS[l.status]||"#888";
       return `<tr>
-        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name||"—"}${telIcon(l.phone, l.name)}</td>
+        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${starBtn(l.id)}${l.name||"—"}${telIcon(l.phone, l.name)}</td>
         <td class="muted">${l.source||"—"}</td>
         <td><span class="badge" style="background:${color}22;color:${color}">${l.status}</span></td>
         <td class="muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${l.address||"—"}</td>
@@ -901,6 +901,22 @@ function cleanDate(raw) {
 }
 
     
+    
+    // __HOT_STAR__ manual hot lead selection system
+    function getHotIds(){ try { return JSON.parse(localStorage.getItem("hotLeadIds") || "[]"); } catch(e){ return []; } }
+    function isHot(id){ return getHotIds().indexOf(id) !== -1; }
+    function toggleHot(id){
+      var ids = getHotIds();
+      var idx = ids.indexOf(id);
+      if (idx === -1) ids.push(id); else ids.splice(idx, 1);
+      localStorage.setItem("hotLeadIds", JSON.stringify(ids));
+      renderHotLeads(); renderLeadsTable(); renderReminders();
+    }
+    function starBtn(id){
+      var hot = isHot(id);
+      return '<span onclick="toggleHot(\x27' + id + '\x27)" style="cursor:pointer;font-size:16px;margin-right:4px;color:' + (hot ? "#d85830" : "#ccc") + '" title="' + (hot ? "Remove from Hot Leads" : "Add to Hot Leads") + '">' + (hot ? "\u2605" : "\u2606") + '</span>';
+    }
+
     // __CLICK_TO_CALL__ phone link helper
     function telLink(phone, label){
       if (!phone) return label || "";
