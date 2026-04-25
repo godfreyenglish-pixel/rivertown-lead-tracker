@@ -629,7 +629,7 @@ function renderAll() {
 // ── Stats ─────────────────────────────────────────────────────
 function renderStats() {
   const pipeline = leads.filter(l=>l.status!=="Commission Paid" && l.status!=="Not Moving Forward");
-  const closed = leads.filter(l=>l.status==="Commission Paid");
+  const closed = leads.filter(l => ["Contract Signed","Permitted","Installed","PTO","Commission Paid"].indexOf(l.status) !== -1);
   const thisMonth = new Date().toISOString().slice(0,7);
   const closedThisMonth = closed.filter(l=>(l.dateCommissionPaid||"").startsWith(thisMonth)).length;
   const pipeVal = pipeline.reduce((s,l)=>s+(parseFloat(l.dealValue)||0),0);
