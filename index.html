@@ -202,6 +202,7 @@
     <div class="tabs">
       <button class="tab active" onclick="showTab('overview',this)">Overview</button>
       <button class="tab" onclick="showTab('add',this)">Add Lead</button>
+<button class="tab" id="hot-tab-btn" onclick="showTab('hot',this)">Hot Leads (0)</button>
       <button class="tab" id="leads-tab-btn" onclick="showTab('leads',this)">Leads (0)</button>
       <button class="tab" onclick="showTab('reports',this)">Reports</button>
       <button class="tab" onclick="showTab('analytics',this)">Analytics</button>
@@ -244,6 +245,15 @@
     </div>
 
     <!-- Leads -->
+
+<div id="tab-hot" class="tab-content">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="margin:0;font-size:20px;color:#2b2b2b;">Hot Active Leads</h2>
+    <span class="muted" id="hot-count-label" style="font-size:13px;"></span>
+  </div>
+  <div id="hot-leads-body"></div>
+</div>
+
     <div id="tab-leads" class="tab-content">
       <div class="filters">
         <input id="search" type="text" placeholder="Search leads..." oninput="renderLeadsTable()">
@@ -573,7 +583,7 @@ function renderArchive() {
     const noteEntries = parseNotes(l.notes||"");
     const lastNote = noteEntries.length ? noteEntries[0].text.slice(0,60)+(noteEntries[0].text.length>60?"...":"") : "—";
     return `<tr style="opacity:0.7">
-      <td style="font-weight:600">${l.name||"—"}${telIcon(l.phone, l.name)}</td>
+      <td style="font-weight:600">${l.name||"—"}</td>
       <td class="muted">${l.source||"—"}</td>
       <td class="muted" style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.address||"—"}</td>
       <td class="mono">${fmt$(l.dealValue)}</td>
@@ -609,6 +619,7 @@ function renderArchive() {
 function renderAll() {
   renderStats(); renderReminders(); renderCharts();
   renderLeadsTable(); renderReports(); renderAnalytics(); renderArchive();
+  renderHotLeads(); renderReports(); renderAnalytics(); renderArchive();
   const activeLeads = leads.filter(l => l.status !== "Not Moving Forward");
   const archivedLeads = leads.filter(l => l.status === "Not Moving Forward");
   document.getElementById("leads-tab-btn").textContent = "Leads ("+activeLeads.length+")";
@@ -660,7 +671,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-            ${l.phone ? `<a href="tel:+${String(l.phone).replace(/\\D+/g,"").replace(/^(\\d{10})$/,"1$1")}" class="btn btn-ghost btn-sm" style="margin-right:4px;color:#d85830;" title="Call ${l.name}">\u{1F4DE}</a>` : ""}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -703,7 +714,44 @@ function renderCharts() {
 }
 
 // ── Leads Table + Mobile Cards ────────────────────────────────
-function renderLeadsTable() {
+
+    function renderHotLeads(){
+      var hot = leads.filter(function(l){
+        return l.status && ["New","Contacted","Proposal Sent","Contract Signed","Permitted"].indexOf(l.status) !== -1;
+      }).sort(function(a,b){
+        var ta = lastTouchOf(a), tb = lastTouchOf(b);
+        return tb > ta ? 1 : tb < ta ? -1 : 0;
+      });
+      var btn = document.getElementById("hot-tab-btn");
+      if (btn) btn.textContent = "Hot Leads (" + hot.length + ")";
+      var el = document.getElementById("hot-leads-body");
+      var lbl = document.getElementById("hot-count-label");
+      if (lbl) lbl.textContent = hot.length + " active leads";
+      if (!el) return;
+      if (hot.length === 0) { el.innerHTML = "<p class=\"muted\">No active leads.</p>"; return; }
+      var html = hot.map(function(l){
+        var d = daysBetween(lastTouchOf(l), cleanDate(new Date()));
+        var dLabel = d === 0 ? "today" : d + "d ago";
+        var dColor = d > 5 ? "#c0392b" : d > 2 ? "#e67e22" : "#888880";
+        var digits = l.phone ? String(l.phone).replace(/[^0-9]/g, "") : "";
+        if (digits.length === 10) digits = "1" + digits;
+        var phoneBtn = digits ? '<a href="tel:+' + digits + '" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#d85830;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4DE} Call</a>' : '<span class="muted" style="font-size:12px;">No phone</span>';
+        var sBg = {"New":"#888880","Contacted":"#3498db","Proposal Sent":"#e67e22","Contract Signed":"#27ae60","Permitted":"#8e44ad"};
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e8e6e1;gap:12px;">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:600;font-size:15px;color:#2b2b2b;">' + (l.name||"\u2014") + '</div>' +
+            '<div style="font-size:12px;color:#888880;margin-top:2px;">' + (l.source||"") + ' \u00B7 <span style="background:' + (sBg[l.status]||"#888880") + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">' + l.status + '</span> \u00B7 <span style="color:' + dColor + '">' + dLabel + '</span></div>' +
+            (l.address ? '<div style="font-size:12px;color:#888880;margin-top:2px;">' + l.address + '</div>' : "") +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+            phoneBtn +
+            '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
+          '</div></div>';
+      }).join("");
+      el.innerHTML = '<div style="background:#fff;border:1px solid #e8e6e1;border-radius:10px;overflow:hidden;">' + html + '</div>';
+    }
+
+    function renderLeadsTable() {
   const search = document.getElementById("search").value.toLowerCase();
   const src = document.getElementById("filter-source").value;
   const status = document.getElementById("filter-status").value;
@@ -723,7 +771,7 @@ function renderLeadsTable() {
       const dtc = daysBetween(l.dateAdded,l.dateClosed);
       const color = STATUS_COLORS[l.status]||"#888";
       return `<tr>
-        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name||"—"}</td>
+        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.name||"—"}${telIcon(l.phone, l.name)}</td>
         <td class="muted">${l.source||"—"}</td>
         <td><span class="badge" style="background:${color}22;color:${color}">${l.status}</span></td>
         <td class="muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${l.address||"—"}</td>
