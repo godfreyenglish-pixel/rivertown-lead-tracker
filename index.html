@@ -271,7 +271,7 @@
       <!-- Desktop table -->
       <div class="table-wrap">
         <table><thead><tr>
-          <th>Name</th><th>Source</th><th>Status</th><th>Address</th><th>Size</th><th>Value</th><th>Commission</th><th>Added</th><th>Closed</th><th>Days</th><th>Last Touch</th><th></th>
+          <th>Name</th><th></th><th>Source</th><th>Status</th><th>Address</th><th>Size</th><th>Value</th><th>Commission</th><th>Added</th><th>Closed</th><th>Days</th><th>Last Touch</th><th></th>
         </tr></thead><tbody id="leads-tbody"></tbody></table>
       </div>
       <!-- Mobile cards -->
@@ -765,13 +765,14 @@ function renderCharts() {
   // Desktop table
   const tbody = document.getElementById("leads-tbody");
   if (!filtered.length) {
-    tbody.innerHTML='<tr><td colspan="12" class="empty">No leads match your filters.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="13" class="empty">No leads match your filters.</td></tr>';
   } else {
     tbody.innerHTML = filtered.map(l => {
       const dtc = daysBetween(l.dateAdded,l.dateClosed);
       const color = STATUS_COLORS[l.status]||"#888";
       return `<tr>
-        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${starBtn(l.id)}${l.name||"—"}${telIcon(l.phone, l.name)}</td>
+        <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${starBtn(l.id)}${l.name||"—"}</td>
+        <td style="text-align:center;">${telIcon(l.phone, l.name)}</td>
         <td class="muted">${l.source||"—"}</td>
         <td><span class="badge" style="background:${color}22;color:${color}">${l.status}</span></td>
         <td class="muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${l.address||"—"}</td>
@@ -810,6 +811,7 @@ function renderCharts() {
       ${l.commissionAmount ? `<div class="lead-card-row"><span>Commission</span><span style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</span></div>` : ""}
       ${dtc!==null ? `<div class="lead-card-row"><span>Days to Close</span><span>${dtc}d</span></div>` : ""}
       <div class="lead-card-actions">
+      ${l.phone ? `<a href="tel:+${String(l.phone).replace(/[^0-9]/g,"").length===10 ? "1"+String(l.phone).replace(/[^0-9]/g,"") : String(l.phone).replace(/[^0-9]/g,"")}" class="btn btn-sm" style="background:#d85830;color:#fff;text-decoration:none;margin-right:6px;font-size:12px;">\u{1F4DE} Call</a>` : ""}
         <button class="btn btn-primary btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
         <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
       </div>
