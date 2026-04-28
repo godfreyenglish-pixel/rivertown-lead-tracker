@@ -450,7 +450,7 @@ async function addLead() {
   try {
     const res = await apiCall("add", data);
     if (res.success) {
-      leads = res.data; renderAll(); clearAddForm();
+     leads = res.data; fetchHotLeads(function() { renderAll(); }); clearAddForm();
       al.innerHTML='<div class="alert alert-ok">Lead added.</div>';
       setTimeout(() => al.innerHTML="", 3000);
     } else al.innerHTML='<div class="alert alert-err">'+(res.error||"Failed.")+'</div>';
@@ -904,15 +904,33 @@ function cleanDate(raw) {
 
     
     
-    // __HOT_STAR__ manual hot lead selection system
-    function getHotIds(){ try { return JSON.parse(localStorage.getItem("hotLeadIds") || "[]"); } catch(e){ return []; } }
-    function isHot(id){ return getHotIds().indexOf(id) !== -1; }
-    function toggleHot(id){
-      var ids = getHotIds();
-      var idx = ids.indexOf(id);
-      if (idx === -1) ids.push(id); else ids.splice(idx, 1);
-      localStorage.setItem("hotLeadIds", JSON.stringify(ids));
-      renderHotLeads(); renderLeadsTable(); renderReminders();
+// __HOT_STAR__ server-synced hot lead system
+    var _hotIds = [];
+    var _hotLoaded = false;
+
+    function fetchHotLeads(cb) {
+      apiCall("getHotLeads", {}).then(function(r) {
+        if (r && r.hotIds) _hotIds = r.hotIds;
+        _hotLoaded = true;
+        if (cb) cb();
+      }).catch(function() {
+        _hotLoaded = true;
+        if (cb) cb();
+      });
+    }
+
+    function getHotIds() { return _hotIds; }
+    function isHot(id) { return _hotIds.indexOf(id) !== -1; }
+
+    function toggleHot(id) {
+      var idx = _hotIds.indexOf(id);
+      if (idx !== -1) { _hotIds.splice(idx, 1); } else { _hotIds.push(id); }
+      renderAll();
+      apiCall("toggleHotLead", { id: id }).catch(function() {
+        var idx2 = _hotIds.indexOf(id);
+        if (idx2 !== -1) { _hotIds.splice(idx2, 1); } else { _hotIds.push(id); }
+        renderAll();
+      });
     }
     function starBtn(id){
       var hot = isHot(id);
