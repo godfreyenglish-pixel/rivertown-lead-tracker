@@ -382,7 +382,7 @@ async function fetchLeads() {
   setBadge(false,"Syncing...");
   try {
     const res = await apiCall("get");
-    if (res.success) { leads=res.data||[]; renderAll(); setBadge(true); }
+    if (res.success) { leads=res.data||[]; fetchHotLeads(function() { renderAll(); }); setBadge(true); }
     else setBadge(false,"Error");
   } catch(e) { setBadge(false,"Connection error"); }
 }
