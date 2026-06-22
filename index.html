@@ -324,6 +324,8 @@ const SRC_COLORS = ["#378ADD","#EF9F27","#639922","#534AB7","#D85A30","#888780"]
 const FOLLOWUP_DAYS = 7;
 
 let leads = [], scriptUrl = "", charts = {};
+  let currentFilteredList = [];
+  let currentLeadId = null;
 
 // ── Storage ──────────────────────────────────────────────────
 function saveUrl(u) { try { localStorage.setItem("rt_url",u); } catch(e){} }
@@ -336,6 +338,12 @@ window.addEventListener("DOMContentLoaded", () => {
   if (u) { scriptUrl = u; showMain(); fetchLeads(); }
   else showSetup();
   document.getElementById("f-dateAdded").value = today();
+  document.addEventListener("keydown", (e) => {
+    if (!currentLeadId) return;
+    if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if (e.key === "ArrowLeft")  { e.preventDefault(); navLead(-1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); navLead(1); }
+  });
 });
 
 function showSetup() { document.getElementById("setup-screen").style.display="block"; document.getElementById("main-screen").style.display="none"; }
@@ -470,6 +478,12 @@ function clearAddForm() {
 function openEdit(lead) {
   const panel = document.getElementById("edit-panel");
   panel.style.display = "block";
+  currentLeadId = lead.id;
+  const _navIdx = currentFilteredList.findIndex(l => l.id === lead.id);
+  const _navTotal = currentFilteredList.length;
+  const _hasPrev = _navIdx > 0;
+  const _hasNext = _navIdx >= 0 && _navIdx < _navTotal - 1;
+  const _posLabel = _navIdx >= 0 ? `${_navIdx + 1} of ${_navTotal}` : "";
   const sOpts = STATUSES.map(s=>`<option ${s===lead.status?"selected":""}>${s}</option>`).join("");
   const srcOpts = SOURCES.map(s=>`<option ${s===lead.source?"selected":""}>${s}</option>`).join("");
   const noteEntries = parseNotes(lead.notes||"");
@@ -485,7 +499,7 @@ function openEdit(lead) {
   panel.innerHTML = `
     <div class="edit-header">
       <span style="font-size:14px;font-weight:600">Edit: ${lead.name}</span>
-      <button class="btn btn-ghost btn-sm" onclick="closeEdit()">Close</button>
+      <div style="display:flex;align-items:center;gap:6px">${_posLabel ? `<span class="muted" style="font-size:11px;margin-right:4px">${_posLabel}</span>` : ""}<button class="btn btn-ghost btn-sm" onclick="navLead(-1)" ${_hasPrev?"":"disabled"} title="Previous lead">‹ Prev</button><button class="btn btn-ghost btn-sm" onclick="navLead(1)" ${_hasNext?"":"disabled"} title="Next lead">Next ›</button><button class="btn btn-ghost btn-sm" onclick="closeEdit()">Close</button></div>
     </div>
     <div class="edit-grid">
       ${ef("Lead Name","e-name","text",lead.name)}
@@ -525,7 +539,18 @@ function ef(label,id,type,val) {
   const cleaned = type === "date" ? (cleanDate(val)||"") : (val||"");
   return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${cleaned}"></div>`;
 }
-function closeEdit() { document.getElementById("edit-panel").style.display="none"; }
+function closeEdit() {
+    document.getElementById("edit-panel").style.display = "none";
+    currentLeadId = null;
+  }
+  function navLead(dir) {
+    if (!currentLeadId || !currentFilteredList.length) return;
+    const idx = currentFilteredList.findIndex(l => l.id === currentLeadId);
+    if (idx === -1) return;
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= currentFilteredList.length) return;
+    openEdit(currentFilteredList[nextIdx]);
+  }
 
 async function addNote(leadId) {
   const newText = document.getElementById("new-note-text").value.trim();
@@ -760,6 +785,7 @@ function renderCharts() {
     (!search||(l.name||"").toLowerCase().includes(search)||(l.address||"").toLowerCase().includes(search)) &&
     (!src||l.source===src) && (!status||l.status===status)
   );
+  currentFilteredList = filtered;
   document.getElementById("lead-count").textContent = filtered.length+" leads";
 
   // Desktop table
