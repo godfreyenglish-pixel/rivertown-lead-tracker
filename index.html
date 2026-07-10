@@ -202,7 +202,7 @@ fetchHotLeads  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(
     <div class="tabs">
       <button class="tab active" onclick="showTab('overview',this)">Overview</button>
       <button class="tab" onclick="showTab('add',this)">Add Lead</button>
-<button class="tab" id="hot-tab-btn" onclick="showTab('hot',this)">Hot Leads (0)</button>
+<button class="tab" id="hot-tab-btn" style="color:#DC2626;font-weight:600" onclick="showTab('hot',this)">Hot Leads (0)</button> <button class="tab" id="customers-tab-btn" style="color:#B8924A;font-weight:600" onclick="showTab('customers',this)">Customers (0)</button>
       <button class="tab" id="leads-tab-btn" onclick="showTab('leads',this)">Leads (0)</button>
       <button class="tab" onclick="showTab('reports',this)">Reports</button>
       <button class="tab" onclick="showTab('analytics',this)">Analytics</button>
@@ -254,7 +254,7 @@ fetchHotLeads  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(
   <div id="hot-leads-body"></div>
 </div>
 
-    <div id="tab-leads" class="tab-content">
+    <div id="tab-customers" class="tab-content"><div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,#1B365D,#0F2A4F);color:#fff"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><div><div style="font-size:16px;font-weight:600;font-family:Georgia,serif">Signed Customers</div><div style="font-size:12px;opacity:0.85;margin-top:2px">Your book of business. Star key accounts with the gold star. Kept separate from Hot Leads.</div></div><label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="cust-starred-only" onchange="renderCustomers()"> Starred only</label></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap"><input id="cust-search" placeholder="Search customers by name or address..." oninput="renderCustomers()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px"><span class="count-badge" id="cust-count">0 customers</span></div><div id="customers-list"></div></div><div id="tab-leads" class="tab-content">
       <div class="filters">
         <input id="search" type="text" placeholder="Search leads..." oninput="renderLeadsTable()">
         <select id="filter-source" onchange="renderLeadsTable()">
@@ -325,6 +325,8 @@ const FOLLOWUP_DAYS = 7;
 
 let leads = [], scriptUrl = "", charts = {};
   let currentFilteredList = [];
+    let _customerStarIds = [];
+    let _custLoaded = false;
   let currentLeadId = null;
 
 // ── Storage ──────────────────────────────────────────────────
@@ -644,7 +646,7 @@ function renderArchive() {
 function renderAll() {
   renderStats(); renderReminders(); renderCharts();
   renderLeadsTable(); renderReports(); renderAnalytics(); renderArchive();
-  renderHotLeads(); renderReports(); renderAnalytics(); renderArchive();
+  renderHotLeads(); renderCustomers(); renderReports(); renderAnalytics(); renderArchive();
   const activeLeads = leads.filter(l => l.status !== "Not Moving Forward");
   const archivedLeads = leads.filter(l => l.status === "Not Moving Forward");
   document.getElementById("leads-tab-btn").textContent = "Leads ("+activeLeads.length+")";
@@ -957,6 +959,63 @@ function cleanDate(raw) {
         if (idx2 !== -1) { _hotIds.splice(idx2, 1); } else { _hotIds.push(id); }
         renderAll();
       });
+    }
+    function fetchCustomerStars(cb) {
+      apiCall("getCustomerStars", {}).then(function(r) {
+        if (r && r.customerStarIds) _customerStarIds = r.customerStarIds.map(String);
+        _custLoaded = true;
+        if (cb) cb();
+      }).catch(function() { _custLoaded = true; if (cb) cb(); });
+    }
+    function isCustomerStarred(id) { return _customerStarIds.indexOf(String(id)) !== -1; }
+    function toggleCustomerStar(id) {
+      var sid = String(id);
+      var idx = _customerStarIds.indexOf(sid);
+      if (idx !== -1) { _customerStarIds.splice(idx, 1); } else { _customerStarIds.push(sid); }
+      renderCustomers();
+      apiCall("toggleCustomerStar", { id: sid }).catch(function() {
+        var i2 = _customerStarIds.indexOf(sid);
+        if (i2 !== -1) { _customerStarIds.splice(i2, 1); } else { _customerStarIds.push(sid); }
+        renderCustomers();
+      });
+    }
+    function custStarBtn(id) {
+      var on = isCustomerStarred(id);
+      return '<span onclick="event.stopPropagation();toggleCustomerStar(\'' + id + '\')" style="cursor:pointer;font-size:18px;line-height:1;color:' + (on ? '#B8924A' : '#D1D5DB') + '" title="Star this customer">' + (on ? '\u2605' : '\u2606') + '</span>';
+    }
+    function renderCustomers() {
+      if (!_custLoaded) { fetchCustomerStars(renderCustomers); }
+      var SIGNED = ["Contract Signed","Permitted","Installed","PTO","Commission Paid"];
+      var allSigned = leads.filter(function(l){ return SIGNED.indexOf(l.status) !== -1; });
+      var btn = document.getElementById("customers-tab-btn");
+      if (btn) btn.textContent = "Customers (" + allSigned.length + ")";
+      var searchEl = document.getElementById("cust-search");
+      var search = (searchEl ? searchEl.value : "").toLowerCase().trim();
+      var starredOnly = document.getElementById("cust-starred-only") && document.getElementById("cust-starred-only").checked;
+      var list = allSigned.slice();
+      if (search) list = list.filter(function(l){ return (l.name||"").toLowerCase().indexOf(search) !== -1 || (l.address||"").toLowerCase().indexOf(search) !== -1; });
+      if (starredOnly) list = list.filter(function(l){ return isCustomerStarred(l.id); });
+      list.sort(function(a,b){
+        var sa = isCustomerStarred(a.id) ? 0 : 1, sb = isCustomerStarred(b.id) ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+        var oa = SIGNED.indexOf(a.status), ob = SIGNED.indexOf(b.status);
+        if (oa !== ob) return oa - ob;
+        return (a.name||"").localeCompare(b.name||"");
+      });
+      var cnt = document.getElementById("cust-count");
+      if (cnt) cnt.textContent = list.length + " customer" + (list.length===1?"":"s");
+      var host = document.getElementById("customers-list");
+      if (!host) return;
+      if (list.length === 0) { host.innerHTML = '<p style="color:var(--text3);font-size:13px;padding:24px;text-align:center">' + (allSigned.length === 0 ? "No signed customers yet. They appear here once a lead reaches Contract Signed." : "No matches.") + '</p>'; return; }
+      host.innerHTML = list.map(function(l){
+        return '<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="openEditById(\'' + l.id + '\')">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+          '<div style="display:flex;align-items:center;gap:10px">' + custStarBtn(l.id) +
+          '<div><div style="font-weight:600">' + (l.name||"(no name)") + '</div>' +
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + (l.status||"") + (l.address ? " &middot; " + l.address : "") + '</div></div></div>' +
+          '<div style="font-size:12px;color:var(--text2)" onclick="event.stopPropagation()">' + (l.phone ? telIcon(l.phone, l.name) : "") + '</div>' +
+          '</div></div>';
+      }).join("");
     }
     function starBtn(id){
       var hot = isHot(id);
