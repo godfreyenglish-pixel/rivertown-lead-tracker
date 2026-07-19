@@ -39,7 +39,7 @@
   .card-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
-fetchHotLeads  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 18px; }
 
   .stat { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 16px; }
   .stat-label { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
@@ -373,6 +373,51 @@ async function apiCall(action, data) {
   return jsonpCall(u);
 }
 
+// ── Why is this lead here? readout ──
+async function whyHere(id) {
+  showWhyModal("Loading...");
+  try {
+    const res = await jsonpCall(scriptUrl + "?action=explainLead&id=" + encodeURIComponent(id));
+    showWhyModal((res && res.explanation) ? res.explanation : "No readout available for this lead.");
+  } catch (e) {
+    showWhyModal("Could not load readout: " + (e && e.message ? e.message : e));
+  }
+}
+
+function showWhyModal(text) {
+  var ov = document.getElementById("why-overlay");
+  if (ov) ov.remove();
+  ov = document.createElement("div");
+  ov.id = "why-overlay";
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;";
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var box = document.createElement("div");
+  box.style.cssText = "background:var(--panel,#fff);color:var(--text,#111);max-width:440px;width:100%;border-radius:12px;padding:22px 24px;box-shadow:0 12px 44px rgba(0,0,0,0.45);";
+  var title = document.createElement("div");
+  title.textContent = "Why is this lead here?";
+  title.style.cssText = "font-weight:700;font-size:16px;margin-bottom:14px;";
+  box.appendChild(title);
+  var body = document.createElement("div");
+  String(text).split("\n").forEach(function(line, idx){
+    if (!line.trim()) return;
+    var p = document.createElement("div");
+    p.textContent = line;
+    p.style.cssText = idx === 0
+      ? "font-weight:600;font-size:14px;margin-bottom:10px;"
+      : "font-size:13px;line-height:1.55;margin-bottom:7px;color:var(--text2,#555);";
+    body.appendChild(p);
+  });
+  box.appendChild(body);
+  var btn = document.createElement("button");
+  btn.textContent = "Close";
+  btn.className = "btn btn-primary btn-sm";
+  btn.style.cssText = "margin-top:16px;";
+  btn.onclick = function(){ ov.remove(); };
+  box.appendChild(btn);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+}
+
 // ── Connect ──────────────────────────────────────────────────
 async function connectSheet() {
   const url = document.getElementById("setup-url").value.trim();
@@ -635,6 +680,7 @@ function renderArchive() {
         </div>
         ${l.dealValue ? `<div class="lead-card-row"><span>Deal Value</span><span>${fmt$(l.dealValue)}</span></div>` : ""}
         <div class="lead-card-actions">
+      <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')">Why?</button>
           <button class="btn btn-primary btn-sm" onclick="openEditById('${l.id}')">Edit / Restore</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
         </div>
@@ -812,6 +858,7 @@ function renderCharts() {
         <td class="mono" style="font-size:11px">${dtc!==null?dtc+"d":"—"}</td>
         <td>${l.lastAutoTouch ? cleanDate(l.lastAutoTouch) : "—"}</td>
         <td><div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')" title="Why is this lead here?">Why?</button>
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
         </div></td>
@@ -839,6 +886,7 @@ function renderCharts() {
       ${l.commissionAmount ? `<div class="lead-card-row"><span>Commission</span><span style="color:var(--green);font-weight:600">${fmt$(l.commissionAmount)}</span></div>` : ""}
       ${dtc!==null ? `<div class="lead-card-row"><span>Days to Close</span><span>${dtc}d</span></div>` : ""}
       <div class="lead-card-actions">
+      <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')">Why?</button>
       ${l.phone ? `<a href="tel:+${String(l.phone).replace(/[^0-9]/g,"").length===10 ? "1"+String(l.phone).replace(/[^0-9]/g,"") : String(l.phone).replace(/[^0-9]/g,"")}" class="btn btn-sm" style="background:#d85830;color:#fff;text-decoration:none;margin-right:6px;font-size:12px;">\u{1F4DE} Call</a>` : ""}
         <button class="btn btn-primary btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
         <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Delete</button>
