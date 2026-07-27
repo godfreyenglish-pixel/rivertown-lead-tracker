@@ -819,6 +819,7 @@ function renderCharts() {
           '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
             phoneBtn +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=afterCallDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#1B365D;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E7} Draft</a>' : '') +
+            (loadUrl() ? '<a href="' + loadUrl() + '?action=modelSim&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#0B6E4F;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F50B} Model</a>' : '') +
             '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
           '</div></div>';
       }).join("");
