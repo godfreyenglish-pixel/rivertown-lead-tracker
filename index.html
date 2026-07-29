@@ -804,7 +804,7 @@ function renderCharts() {
       if (hot.length === 0) { el.innerHTML = "<p class=\"muted\" style=\"text-align:center;padding:40px 20px;\">No leads starred yet.<br><br>Tap the \u2606 star icon on any lead to add them here.</p>"; return; }
       var html = hot.map(function(l){
         var d = daysBetween(lastTouchOf(l), cleanDate(new Date()));
-        var dLabel = d === 0 ? "today" : d + "d ago";
+        var dLabel = (d==null) ? "just added" : (d === 0 ? "today" : d + "d ago");
         var dColor = d > 5 ? "#c0392b" : d > 2 ? "#e67e22" : "#888880";
         var digits = l.phone ? String(l.phone).replace(/[^0-9]/g, "") : "";
         if (digits.length === 10) digits = "1" + digits;
@@ -1093,7 +1093,7 @@ function cleanDate(raw) {
 
     // __LT_HELPER__ (last-touch + auto-touch helper)
     function lastTouchOf(l){
-      if (!l) return "1970-01-01";
+      if (!l) return null;
       var ts=[];
       function add(v){ if (!v) return; var d=new Date(v); if (!isNaN(d)) ts.push(d.getTime()); }
       add(l.dateAdded); add(l.lastAutoTouch);
@@ -1102,7 +1102,7 @@ function cleanDate(raw) {
         var m=(s.match(/\d{4}-\d{2}-\d{2}/g)||[]).concat(s.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/g)||[]);
         m.forEach(function(x){ var d=new Date(x); if (!isNaN(d)) ts.push(d.getTime()); });
       }
-      if (ts.length===0) return l.dateAdded||"1970-01-01";
+      if (ts.length===0) return null;
       return new Date(Math.max.apply(null, ts)).toISOString().slice(0,10);
     }
     function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
