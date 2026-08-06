@@ -159,6 +159,31 @@
     .tabs .tab { padding: 8px 12px; font-size: 12px; }
     .card { padding: 12px 14px; }
   }
+  /* My Day tab */
+  .myday-ta { width:100%; min-height:130px; padding:10px; border:0.5px solid var(--border); border-radius:var(--radius-sm); font-size:13px; font-family:inherit; resize:vertical; background:var(--surface2); color:var(--text); outline:none; box-sizing:border-box; }
+  .myday-ta:focus { border-color:var(--accent); }
+  .myday-inp { padding:8px 10px; border:0.5px solid var(--border); border-radius:var(--radius-sm); font-size:12px; background:var(--surface); color:var(--text); outline:none; font-family:inherit; }
+  .myday-inp:focus { border-color:var(--accent); }
+  .myday-task { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:0.5px solid var(--border); }
+  .myday-task.done .myday-task-text { text-decoration:line-through; color:var(--text3); }
+  .myday-pri { font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; text-transform:uppercase; }
+  .myday-pri.high { background:#fde8e8; color:#c0392b; }
+  .myday-pri.med { background:#fdf2e0; color:#b8860b; }
+  .myday-pri.low { background:#eef2f0; color:#5a6b62; }
+  .myday-x { cursor:pointer; color:var(--text3); font-size:16px; line-height:1; }
+  .myday-x:hover { color:#c0392b; }
+  .myday-navbtn { background:none; border:0.5px solid var(--border); border-radius:6px; width:28px; height:28px; cursor:pointer; color:var(--text2); font-size:15px; }
+  .myday-navbtn:hover { border-color:var(--accent); color:var(--text); }
+  .myday-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .myday-cal .dow { font-size:9px; color:var(--text3); text-align:center; padding:2px 0; text-transform:uppercase; }
+  .myday-cal .day { aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; border-radius:6px; color:var(--text); cursor:pointer; }
+  .myday-cal .day:hover { background:var(--surface2); }
+  .myday-cal .day.today { background:var(--accent-light); font-weight:700; }
+  .myday-cal .day.has-rem { box-shadow:inset 0 0 0 1px var(--accent); }
+  .myday-cal .day .dot { width:4px; height:4px; border-radius:50%; background:var(--accent); margin-top:2px; }
+  .myday-cal .day.empty { visibility:hidden; cursor:default; }
+  .myday-rem-item { display:flex; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:0.5px solid var(--border); font-size:12px; }
+  .myday-rem-item.overdue .myday-rem-date { color:#c0392b; font-weight:600; }
 </style>
 </head>
 <body>
@@ -201,12 +226,68 @@
 
     <div class="tabs">
       <button class="tab active" onclick="showTab('overview',this)">Overview</button>
+      <button class="tab" onclick="showTab('myday',this); renderMyDay();">My Day</button>
       <button class="tab" onclick="showTab('add',this)">Add Lead</button>
 <button class="tab" id="hot-tab-btn" style="color:#DC2626;font-weight:600" onclick="showTab('hot',this)">Hot Leads (0)</button> <button class="tab" id="customers-tab-btn" style="color:#B8924A;font-weight:600" onclick="showTab('customers',this)">Customers (0)</button>
       <button class="tab" id="leads-tab-btn" onclick="showTab('leads',this)">Leads (0)</button>
       <button class="tab" onclick="showTab('reports',this)">Reports</button>
       <button class="tab" onclick="showTab('analytics',this)">Analytics</button>
       <button class="tab" id="archive-tab-btn" onclick="showTab('archive',this)">Archive (0)</button>
+    </div>
+
+    <!-- My Day -->
+    <div id="tab-myday" class="tab-content">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)">My Day</div>
+          <div style="font-size:12px;color:var(--text2)" id="myday-date"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">Saved on this device</div>
+      </div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Today's Plan</div>
+          <textarea id="myday-notes" class="myday-ta" placeholder="How are you attacking the day? Priorities, call list, notes to self..."></textarea>
+        </div>
+        <div class="card">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Due &amp; Overdue</div>
+          <div id="myday-due"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;font-weight:600">Follow-Up Checklist</div>
+          <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="mydayPullHot()">+ Pull Hot Leads</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input id="myday-task-input" class="myday-inp" placeholder="Add a follow-up task..." onkeydown="if(event.key==='Enter')mydayAddTask()" style="flex:1;min-width:160px">
+          <select id="myday-task-pri" class="myday-inp"><option value="high">High</option><option value="med" selected>Med</option><option value="low">Low</option></select>
+          <button class="btn btn-primary" style="font-size:12px" onclick="mydayAddTask()">Add</button>
+        </div>
+        <div id="myday-tasks"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <button class="myday-navbtn" onclick="mydayCalMonth(-1)">&lsaquo;</button>
+            <div style="font-size:13px;font-weight:600" id="myday-caltitle"></div>
+            <button class="myday-navbtn" onclick="mydayCalMonth(1)">&rsaquo;</button>
+          </div>
+          <div id="myday-calendar" class="myday-cal"></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:center">Tap a day to set a reminder date</div>
+        </div>
+        <div class="card">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Add Reminder</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+            <select id="myday-rem-lead" class="myday-inp"></select>
+            <input type="date" id="myday-rem-date" class="myday-inp">
+            <input id="myday-rem-note" class="myday-inp" placeholder="Note (e.g. call about proposal)">
+            <button class="btn btn-primary" style="font-size:12px" onclick="mydayAddReminder()">Set Reminder</button>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Upcoming</div>
+          <div id="myday-reminders"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Overview -->
@@ -1108,5 +1189,136 @@ function cleanDate(raw) {
     function daysBetween(d1,d2) { if(!d1||!d2) return null; const a=new Date(cleanDate(d1)||d1), b=new Date(cleanDate(d2)||d2); return Math.round((b-a)/86400000); }
 function fmt$(n) { return n ? "$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0}) : "—"; }
 </script>
+<script>
+/* ===== MY DAY (personal agenda, stored per-browser) ===== */
+function mdGet(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }
+function mdSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function mdEsc(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];}); }
+function mdToday(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function mdFmtDate(s){ try{ var p=String(s).split('-'); return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch(e){ return s; } }
+var _mdCalOffset = 0;
+
+function renderMyDay(){
+  var dt=new Date(), el=document.getElementById('myday-date');
+  if(el) el.textContent = dt.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  var ta=document.getElementById('myday-notes');
+  if(ta && document.activeElement!==ta){ ta.value = mdGet('rt_myday_notes',''); ta.oninput=function(){ mdSet('rt_myday_notes', ta.value); }; }
+  mdRenderTasks(); mdFillLeadSelect(); mdRenderReminders(); mdRenderDue(); mdRenderCalendar();
+}
+
+function mdLeadList(){ try{ return (typeof leads!=='undefined' && leads) ? leads : []; }catch(e){ return []; } }
+function mdHotIds(){ try{ return (typeof getHotIds==='function') ? getHotIds() : []; }catch(e){ return []; } }
+function mdFillLeadSelect(){
+  var sel=document.getElementById('myday-rem-lead'); if(!sel) return;
+  var cur=sel.value, all=mdLeadList(), hotIds=mdHotIds();
+  var hot=all.filter(function(l){return hotIds.indexOf(l.id)!==-1 && l.name;});
+  var others=all.filter(function(l){return hotIds.indexOf(l.id)===-1 && l.name;});
+  var o='<option value="">General reminder (no lead)</option>';
+  hot.forEach(function(l){ o+='<option value="'+l.id+'">\u2605 '+mdEsc(l.name)+'</option>'; });
+  others.forEach(function(l){ o+='<option value="'+l.id+'">'+mdEsc(l.name)+'</option>'; });
+  sel.innerHTML=o; if(cur) sel.value=cur;
+}
+
+/* tasks */
+function mydayAddTask(){
+  var inp=document.getElementById('myday-task-input'), pri=document.getElementById('myday-task-pri');
+  var text=(inp.value||'').trim(); if(!text) return;
+  var t=mdGet('rt_myday_tasks',[]);
+  t.push({id:'t'+Date.now()+Math.floor(Math.random()*999), text:text, priority:pri.value, done:false});
+  mdSet('rt_myday_tasks',t); inp.value=''; mdRenderTasks();
+}
+function mydayToggleTask(id){ var t=mdGet('rt_myday_tasks',[]); t.forEach(function(x){ if(x.id===id) x.done=!x.done; }); mdSet('rt_myday_tasks',t); mdRenderTasks(); }
+function mydayDelTask(id){ mdSet('rt_myday_tasks', mdGet('rt_myday_tasks',[]).filter(function(x){return x.id!==id;})); mdRenderTasks(); }
+function mdRenderTasks(){
+  var el=document.getElementById('myday-tasks'); if(!el) return;
+  var t=mdGet('rt_myday_tasks',[]), order={high:0,med:1,low:2};
+  t.sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return (order[a.priority]||1)-(order[b.priority]||1); });
+  if(!t.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:6px 0">No tasks yet. Add follow-ups above, or pull your hot leads.</div>'; return; }
+  el.innerHTML=t.map(function(x){
+    return '<div class="myday-task'+(x.done?' done':'')+'">'
+      +'<input type="checkbox" '+(x.done?'checked':'')+' onclick="mydayToggleTask(\''+x.id+'\')" style="accent-color:var(--accent);width:15px;height:15px">'
+      +'<span class="myday-pri '+x.priority+'">'+x.priority+'</span>'
+      +'<span class="myday-task-text" style="flex:1;font-size:13px">'+mdEsc(x.text)+'</span>'
+      +'<span class="myday-x" onclick="mydayDelTask(\''+x.id+'\')">\u00d7</span>'
+      +'</div>';
+  }).join('');
+}
+function mydayPullHot(){
+  var t=mdGet('rt_myday_tasks',[]), have={}; t.forEach(function(x){have[x.text]=true;});
+  var all=mdLeadList(), hotIds=mdHotIds();
+  all.filter(function(l){return hotIds.indexOf(l.id)!==-1 && l.name;}).forEach(function(l){
+    var txt='Follow up: '+l.name+(l.status?' ('+l.status+')':'');
+    if(!have[txt]){ t.push({id:'t'+Date.now()+Math.floor(Math.random()*9999), text:txt, priority:'high', done:false}); have[txt]=true; }
+  });
+  mdSet('rt_myday_tasks',t); mdRenderTasks();
+}
+
+/* reminders */
+function mydayAddReminder(){
+  var sel=document.getElementById('myday-rem-lead'), date=document.getElementById('myday-rem-date'), note=document.getElementById('myday-rem-note');
+  var d=(date.value||'').trim(); if(!d){ alert('Pick a date for the reminder.'); return; }
+  var leadId=sel.value||'', leadName='';
+  if(leadId){ var L=mdLeadList().filter(function(l){return l.id===leadId;})[0]; leadName=L?L.name:''; }
+  var r=mdGet('rt_myday_reminders',[]);
+  r.push({id:'r'+Date.now()+Math.floor(Math.random()*999), leadId:leadId, leadName:leadName, date:d, note:(note.value||'').trim(), done:false});
+  mdSet('rt_myday_reminders',r); note.value='';
+  mdRenderReminders(); mdRenderDue(); mdRenderCalendar();
+}
+function mydayDoneReminder(id){ var r=mdGet('rt_myday_reminders',[]); r.forEach(function(x){ if(x.id===id) x.done=true; }); mdSet('rt_myday_reminders',r); mdRenderReminders(); mdRenderDue(); mdRenderCalendar(); }
+function mydayDelReminder(id){ mdSet('rt_myday_reminders', mdGet('rt_myday_reminders',[]).filter(function(x){return x.id!==id;})); mdRenderReminders(); mdRenderDue(); mdRenderCalendar(); }
+function mdRenderReminders(){
+  var el=document.getElementById('myday-reminders'); if(!el) return;
+  var r=mdGet('rt_myday_reminders',[]).filter(function(x){return !x.done;});
+  r.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  if(!r.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:6px 0">No reminders set.</div>'; return; }
+  var today=mdToday();
+  el.innerHTML=r.map(function(x){
+    var od=x.date<today;
+    return '<div class="myday-rem-item'+(od?' overdue':'')+'">'
+      +'<input type="checkbox" onclick="mydayDoneReminder(\''+x.id+'\')" style="accent-color:var(--accent);width:14px;height:14px;margin-top:2px">'
+      +'<div style="flex:1"><div style="font-weight:600">'+(x.leadName?mdEsc(x.leadName):'General')+'</div>'
+      +(x.note?'<div style="color:var(--text2)">'+mdEsc(x.note)+'</div>':'')
+      +'<div class="myday-rem-date" style="font-size:11px;color:var(--text3)">'+mdFmtDate(x.date)+(od?' \u00b7 overdue':'')+'</div></div>'
+      +'<span class="myday-x" onclick="mydayDelReminder(\''+x.id+'\')">\u00d7</span></div>';
+  }).join('');
+}
+function mdRenderDue(){
+  var el=document.getElementById('myday-due'); if(!el) return;
+  var today=mdToday();
+  var r=mdGet('rt_myday_reminders',[]).filter(function(x){return !x.done && x.date<=today;});
+  r.sort(function(a,b){ return a.date<b.date?-1:1; });
+  if(!r.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;padding:6px 0">Nothing due. You\'re clear.</div>'; return; }
+  el.innerHTML=r.map(function(x){
+    var od=x.date<today;
+    return '<div class="myday-rem-item'+(od?' overdue':'')+'">'
+      +'<div style="flex:1"><div style="font-weight:600">'+(x.leadName?mdEsc(x.leadName):'General')+'</div>'
+      +(x.note?'<div style="color:var(--text2)">'+mdEsc(x.note)+'</div>':'')
+      +'<div class="myday-rem-date" style="font-size:11px">'+(od?'Overdue \u00b7 ':'Today \u00b7 ')+mdFmtDate(x.date)+'</div></div>'
+      +'<button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="mydayDoneReminder(\''+x.id+'\')">Done</button></div>';
+  }).join('');
+}
+
+/* calendar */
+function mydayCalMonth(delta){ _mdCalOffset+=delta; mdRenderCalendar(); }
+function mydayPickDay(ds){ var i=document.getElementById('myday-rem-date'); if(i){ i.value=ds; i.focus(); } }
+function mdRenderCalendar(){
+  var el=document.getElementById('myday-calendar'); if(!el) return;
+  var base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+_mdCalOffset);
+  var y=base.getFullYear(), m=base.getMonth();
+  var title=document.getElementById('myday-caltitle'); if(title) title.textContent=base.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  var first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  var byDay={}; mdGet('rt_myday_reminders',[]).filter(function(r){return !r.done;}).forEach(function(r){ var p=String(r.date).split('-'); if(+p[0]===y && (+p[1]-1)===m) byDay[+p[2]]=(byDay[+p[2]]||0)+1; });
+  var now=new Date(), thisMonth=(now.getFullYear()===y && now.getMonth()===m);
+  var html=['S','M','T','W','T','F','S'].map(function(d){return '<div class="dow">'+d+'</div>';}).join('');
+  for(var i=0;i<first;i++) html+='<div class="day empty"></div>';
+  for(var d=1;d<=days;d++){
+    var cls='day'; if(thisMonth && d===now.getDate()) cls+=' today'; if(byDay[d]) cls+=' has-rem';
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    html+='<div class="'+cls+'" onclick="mydayPickDay(\''+ds+'\')">'+d+(byDay[d]?'<span class="dot"></span>':'')+'</div>';
+  }
+  el.innerHTML=html;
+}
+</script>
+
 </body>
 </html>
