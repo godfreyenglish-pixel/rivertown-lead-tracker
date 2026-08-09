@@ -566,6 +566,69 @@ async function submitLog(id){
   }
 }
 
+// ── Resume: AI reads timeline, drafts next touch (Phase 2B) ──
+function rEsc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+function openResume(id){
+  var lead = leads.find(function(l){ return l.id===id; });
+  if(!lead) return;
+  var ov=document.getElementById("resume-overlay"); if(ov) ov.remove();
+  ov=document.createElement("div"); ov.id="resume-overlay";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;";
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var box=document.createElement("div"); box.id="resume-box";
+  box.style.cssText="background:#fff;color:#1a1712;max-width:560px;width:100%;max-height:88vh;overflow:auto;border-radius:12px;padding:20px 22px;box-shadow:0 12px 44px rgba(0,0,0,0.45);";
+  box.innerHTML='<div style="font-weight:700;font-size:16px;margin-bottom:12px;">Resume · '+rEsc(lead.name||"lead")+'</div><div style="color:#666;font-size:14px;padding:16px 0;">Reading the timeline and drafting your next touch...</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  apiCall("resumeTouch",{id:id}).then(function(res){
+    if(!res || !res.success){ box.innerHTML='<div style="font-weight:700;font-size:16px;margin-bottom:12px;">Resume · '+rEsc(lead.name||"lead")+'</div><div style="color:#b00020;font-size:13px;">'+((res&&res.error)||"Could not read this lead.")+'</div><div style="text-align:right;margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resume-overlay\').remove()">Close</button></div>'; return; }
+    renderResume(lead, res);
+  }).catch(function(e){ box.innerHTML='<div style="font-weight:700;font-size:16px;margin-bottom:12px;">Resume · '+rEsc(lead.name||"lead")+'</div><div style="color:#b00020;font-size:13px;">'+rEsc(e.message)+'</div><div style="text-align:right;margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resume-overlay\').remove()">Close</button></div>'; });
+}
+function renderResume(lead, res){
+  var box=document.getElementById("resume-box"); if(!box) return;
+  var diffStatus = res.status && res.status!==lead.status;
+  var statusHtml='<div style="font-size:13px;margin:10px 0;"><span style="color:#666">Suggested status:</span> <b>'+rEsc(res.status||lead.status)+'</b>'+
+    (diffStatus? ' <button class="btn btn-sm" id="resume-apply" style="background:#A67C29;color:#fff;border-color:#A67C29;margin-left:6px;font-size:12px;" onclick="applyResumeStatus(\''+lead.id+'\',this.getAttribute(\'data-s\'))" data-s="'+rEsc(res.status)+'">Apply</button>' : ' <span style="color:#4a7">(current)</span>')+'</div>';
+  window.__resumeEmail = res.email||"";
+  box.innerHTML =
+    '<div style="font-weight:700;font-size:16px;margin-bottom:10px;">Resume · '+rEsc(lead.name||"lead")+'</div>'+
+    (res.stand? '<div style="font-size:13px;margin-bottom:6px;"><b>Where it stands:</b> '+rEsc(res.stand)+'</div>':'')+
+    (res.next? '<div style="font-size:13px;margin-bottom:6px;"><b>Next step:</b> '+rEsc(res.next)+'</div>':'')+
+    statusHtml+
+    '<label style="font-size:12px;color:#666;">Subject</label>'+
+    '<input id="resume-subject" value="'+rEsc(res.subject||"")+'" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #d8d5cd;border-radius:8px;font-size:14px;">'+
+    '<label style="font-size:12px;color:#666;">Draft (edit before sending)</label>'+
+    '<textarea id="resume-body" rows="10" style="width:100%;padding:9px;margin:4px 0 12px;border:1px solid #d8d5cd;border-radius:8px;font-size:14px;resize:vertical;">'+rEsc(res.body||"")+'</textarea>'+
+    '<div id="resume-msg" style="font-size:12px;color:#4a7;min-height:14px;margin-bottom:8px;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'+
+      '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resume-overlay\').remove()">Close</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="copyResume()">Copy</button>'+
+      '<button class="btn btn-sm" onclick="gmailResume()" style="background:#A67C29;color:#fff;border-color:#A67C29;">Open in Gmail</button>'+
+    '</div>';
+}
+async function applyResumeStatus(id, status){
+  var lead=leads.find(function(l){return l.id===id;}); if(!lead) return;
+  var btn=document.getElementById("resume-apply"); if(btn){ btn.disabled=true; btn.textContent="..."; }
+  try{
+    var updated=Object.assign({},lead,{status:status});
+    var res=await apiCall("update",updated);
+    if(res && res.success){ leads=res.data; if(typeof renderAll==="function") renderAll(); if(btn){ btn.textContent="Applied ✓"; } }
+    else if(btn){ btn.disabled=false; btn.textContent="Apply"; }
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent="Apply"; } }
+}
+function copyResume(){
+  var s=document.getElementById("resume-subject").value;
+  var b=document.getElementById("resume-body").value;
+  var msg=document.getElementById("resume-msg");
+  navigator.clipboard.writeText(s+"\n\n"+b).then(function(){ if(msg){ msg.style.color="#4a7"; msg.textContent="Copied."; } }).catch(function(){ if(msg){ msg.style.color="#b00020"; msg.textContent="Copy failed."; } });
+}
+function gmailResume(){
+  var to=window.__resumeEmail||"";
+  var s=encodeURIComponent(document.getElementById("resume-subject").value);
+  var b=encodeURIComponent(document.getElementById("resume-body").value);
+  window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent(to)+"&su="+s+"&body="+b,"_blank","noopener");
+}
+
 // ── Connect ──────────────────────────────────────────────────
 async function connectSheet() {
   const url = document.getElementById("setup-url").value.trim();
@@ -892,7 +955,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openLog("${l.id}")' title="Log a call, text or note">📞 Log</button><button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openLog("${l.id}")' title="Log a call, text or note">📞 Log</button><button class="btn btn-ghost btn-sm" onclick='openResume("${l.id}")' title="AI: read timeline, draft next touch">✨ Resume</button><button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -970,6 +1033,7 @@ function renderCharts() {
             (loadUrl() ? '<a href="' + loadUrl() + '?action=lastTouchDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" title="Draft the post-proposal last-touch email" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#B8924A;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E8} Last Touch</a>' : '') +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=modelSim&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#0B6E4F;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F50B} Model</a>' : '') +
             '<button class="btn btn-ghost btn-sm" onclick=\'openLog("' + l.id + '")\' style="font-size:13px;" title="Log a call, text or note">📞 Log</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick=\'openResume("' + l.id + '")\' style="font-size:13px;" title="AI: read timeline, draft next touch">✨ Resume</button>' +
             '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
           '</div></div>';
       }).join("");
@@ -1011,6 +1075,7 @@ function renderCharts() {
         <td>${l.lastAutoTouch ? cleanDate(l.lastAutoTouch) : "—"}</td>
         <td><div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="openLog('${l.id}')" title="Log a call, text or note">📞 Log</button>
+          <button class="btn btn-ghost btn-sm" onclick="openResume('${l.id}')" title="AI: read timeline, draft next touch">✨ Resume</button>
           <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')" title="Why is this lead here?">Why?</button>
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
