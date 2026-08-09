@@ -184,6 +184,12 @@
   .myday-cal .day.empty { visibility:hidden; cursor:default; }
   .myday-rem-item { display:flex; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:0.5px solid var(--border); font-size:12px; }
   .myday-rem-item.overdue .myday-rem-date { color:#c0392b; font-weight:600; }
+  /* Hot Leads: stack action buttons under the name on phones so the row never overflows */
+  @media (max-width: 600px) {
+    .hot-row { flex-direction: column !important; align-items: stretch !important; }
+    .hot-actions { flex-wrap: wrap !important; margin-top: 10px !important; gap: 6px !important; }
+    .hot-actions > a, .hot-actions > button { flex: 1 1 30% !important; justify-content: center !important; text-align: center !important; }
+  }
 </style>
 </head>
 <body>
@@ -891,13 +897,13 @@ function renderCharts() {
         if (digits.length === 10) digits = "1" + digits;
         var phoneBtn = digits ? '<a href="tel:+' + digits + '" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#d85830;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4DE} Call</a>' : '<span class="muted" style="font-size:12px;">No phone</span>';
         var sBg = {"New":"#888880","Contacted":"#3498db","Proposal Sent":"#e67e22","Contract Signed":"#27ae60","Permitted":"#8e44ad","Installed":"#2c3e50","PTO":"#16a085","Commission Paid":"#c0392b"};
-        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e8e6e1;gap:12px;">' +
+        return '<div class="hot-row" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e8e6e1;gap:12px;">' +
           '<div style="flex:1;min-width:0;">' +
             '<div style="display:flex;align-items:center;font-weight:600;font-size:15px;color:#2b2b2b;">' + starBtn(l.id) + (l.name||"\u2014") + '</div>' +
             '<div style="font-size:12px;color:#888880;margin-top:2px;">' + (l.source||"") + ' \u00B7 <span style="background:' + (sBg[l.status]||"#888880") + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">' + l.status + '</span> \u00B7 <span style="color:' + dColor + '">' + dLabel + '</span></div>' +
             (l.address ? '<div style="font-size:12px;color:#888880;margin-top:2px;">' + l.address + '</div>' : "") +
           '</div>' +
-          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+          '<div class="hot-actions" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
             phoneBtn +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=afterCallDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#1B365D;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E7} Draft</a>' : '') +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=lastTouchDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" title="Draft the post-proposal last-touch email" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#B8924A;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E8} Last Touch</a>' : '') +
