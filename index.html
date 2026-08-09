@@ -505,6 +505,67 @@ function showWhyModal(text) {
   document.body.appendChild(ov);
 }
 
+// ── Log Call / interaction (Phase 2A) ────────────────────────
+function openLog(id){
+  var lead = leads.find(function(l){ return l.id===id; });
+  if(!lead) return;
+  var ov=document.getElementById("log-overlay"); if(ov) ov.remove();
+  ov=document.createElement("div"); ov.id="log-overlay";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;";
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var box=document.createElement("div");
+  box.style.cssText="background:#fff;color:#1a1712;max-width:420px;width:100%;border-radius:12px;padding:20px 22px;box-shadow:0 12px 44px rgba(0,0,0,0.45);";
+  var selCss="width:100%;padding:9px;margin:4px 0 12px;border:1px solid #d8d5cd;border-radius:8px;font-size:14px;";
+  box.innerHTML =
+    '<div style="font-weight:700;font-size:16px;margin-bottom:14px;">Log · '+((lead.name||"lead").replace(/</g,"&lt;"))+'</div>'+
+    '<label style="font-size:12px;color:#666;">Type</label>'+
+    '<select id="log-kind" style="'+selCss+'"><option value="call">Call</option><option value="text">Text</option><option value="email">Email</option><option value="note">Note</option></select>'+
+    '<label style="font-size:12px;color:#666;">Outcome</label>'+
+    '<select id="log-outcome" style="'+selCss+'">'+
+      '<option>Reached, interested</option>'+
+      '<option>Reached, not now</option>'+
+      '<option>Left voicemail</option>'+
+      '<option>No answer</option>'+
+      '<option>Sent text</option>'+
+      '<option>Wants proposal</option>'+
+      '<option>Scheduling site survey</option>'+
+      '<option>Not interested</option>'+
+      '<option>Note only</option>'+
+    '</select>'+
+    '<label style="font-size:12px;color:#666;">Note (optional)</label>'+
+    '<textarea id="log-text" rows="3" placeholder="What was said, next step..." style="width:100%;padding:9px;margin:4px 0 14px;border:1px solid #d8d5cd;border-radius:8px;font-size:14px;resize:vertical;"></textarea>'+
+    '<div id="log-alert" style="font-size:13px;min-height:16px;margin-bottom:8px;color:#666;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+      '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'log-overlay\').remove()">Cancel</button>'+
+      '<button class="btn btn-sm" id="log-save" onclick="submitLog(\''+id+'\')" style="background:#A67C29;color:#fff;border-color:#A67C29;">Save</button>'+
+    '</div>';
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+}
+
+async function submitLog(id){
+  var kind=document.getElementById("log-kind").value;
+  var outcome=document.getElementById("log-outcome").value;
+  var text=document.getElementById("log-text").value.trim();
+  var al=document.getElementById("log-alert");
+  var btn=document.getElementById("log-save");
+  if(al){ al.style.color="#666"; al.textContent="Saving..."; }
+  if(btn) btn.disabled=true;
+  try{
+    var res=await apiCall("logInteraction",{ id:id, kind:kind, outcome:outcome, text:text });
+    if(res && res.success){
+      var ov=document.getElementById("log-overlay"); if(ov) ov.remove();
+      await fetchLeads();
+    } else {
+      if(al){ al.style.color="#b00020"; al.textContent=(res&&res.error)?res.error:"Failed to log."; }
+      if(btn) btn.disabled=false;
+    }
+  }catch(e){
+    if(al){ al.style.color="#b00020"; al.textContent=e.message||"Error."; }
+    if(btn) btn.disabled=false;
+  }
+}
+
 // ── Connect ──────────────────────────────────────────────────
 async function connectSheet() {
   const url = document.getElementById("setup-url").value.trim();
@@ -831,7 +892,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openLog("${l.id}")' title="Log a call, text or note">📞 Log</button><button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -908,6 +969,7 @@ function renderCharts() {
             (loadUrl() ? '<a href="' + loadUrl() + '?action=afterCallDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#1B365D;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E7} Draft</a>' : '') +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=lastTouchDraft&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" title="Draft the post-proposal last-touch email" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#B8924A;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F4E8} Last Touch</a>' : '') +
             (loadUrl() ? '<a href="' + loadUrl() + '?action=modelSim&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#0B6E4F;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F50B} Model</a>' : '') +
+            '<button class="btn btn-ghost btn-sm" onclick=\'openLog("' + l.id + '")\' style="font-size:13px;" title="Log a call, text or note">📞 Log</button>' +
             '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
           '</div></div>';
       }).join("");
@@ -948,6 +1010,7 @@ function renderCharts() {
         <td class="mono" style="font-size:11px">${dtc!==null?dtc+"d":"—"}</td>
         <td>${l.lastAutoTouch ? cleanDate(l.lastAutoTouch) : "—"}</td>
         <td><div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="openLog('${l.id}')" title="Log a call, text or note">📞 Log</button>
           <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')" title="Why is this lead here?">Why?</button>
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
