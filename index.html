@@ -629,6 +629,55 @@ function gmailResume(){
   window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent(to)+"&su="+s+"&body="+b,"_blank","noopener");
 }
 
+// ── Add Bill: self-serve energy bill entry (Phase 2D) ────────
+function openBill(id){
+  var lead = leads.find(function(l){ return l.id===id; });
+  if(!lead) return;
+  var ov=document.getElementById("bill-overlay"); if(ov) ov.remove();
+  ov=document.createElement("div"); ov.id="bill-overlay";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;";
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var box=document.createElement("div");
+  box.style.cssText="background:#fff;color:#1a1712;max-width:420px;width:100%;border-radius:12px;padding:20px 22px;box-shadow:0 12px 44px rgba(0,0,0,0.45);";
+  var inCss="width:100%;padding:9px;margin:4px 0 12px;border:1px solid #d8d5cd;border-radius:8px;font-size:14px;box-sizing:border-box;";
+  box.innerHTML =
+    '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">Add Bill · '+rEsc(lead.name||"lead")+'</div>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:12px;">Type the numbers off their Con Edison bill.</div>'+
+    '<label style="font-size:12px;color:#666;">This month’s usage (kWh)</label>'+
+    '<input id="bill-kwh" type="number" inputmode="decimal" placeholder="e.g. 720" style="'+inCss+'">'+
+    '<label style="font-size:12px;color:#666;">This month’s bill ($)</label>'+
+    '<input id="bill-due" type="number" inputmode="decimal" placeholder="e.g. 214.50" style="'+inCss+'">'+
+    '<label style="font-size:12px;color:#666;">Billing month (optional)</label>'+
+    '<input id="bill-month" placeholder="e.g. Jul 2026" style="'+inCss+'">'+
+    '<label style="font-size:12px;color:#666;">Rate class (optional)</label>'+
+    '<input id="bill-rate" placeholder="e.g. Res Rate 1" style="'+inCss+'">'+
+    '<div id="bill-alert" style="font-size:13px;min-height:16px;margin-bottom:8px;color:#666;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+      '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'bill-overlay\').remove()">Cancel</button>'+
+      '<button class="btn btn-sm" id="bill-save" onclick="submitBill(\''+id+'\')" style="background:#A67C29;color:#fff;border-color:#A67C29;">Save bill</button>'+
+    '</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+}
+async function submitBill(id){
+  var kwh=document.getElementById("bill-kwh").value.trim();
+  var due=document.getElementById("bill-due").value.trim();
+  var month=document.getElementById("bill-month").value.trim();
+  var rate=document.getElementById("bill-rate").value.trim();
+  var al=document.getElementById("bill-alert"); var btn=document.getElementById("bill-save");
+  if(!kwh || !due){ if(al){ al.style.color="#b00020"; al.textContent="Enter at least usage and bill amount."; } return; }
+  if(al){ al.style.color="#666"; al.textContent="Saving..."; } if(btn) btn.disabled=true;
+  try{
+    var res=await apiCall("addBill",{ id:id, kwh:kwh, due:due, month:month, rateClass:rate });
+    if(res && res.success){
+      if(al){ al.style.color="#4a7"; al.textContent="Saved. All-in rate ~$"+(res.allInRate||"?")+"/kWh."; }
+      if(btn){ btn.textContent="Saved ✓"; }
+      setTimeout(function(){ var ov=document.getElementById("bill-overlay"); if(ov) ov.remove(); }, 1300);
+    } else {
+      if(al){ al.style.color="#b00020"; al.textContent=(res&&res.error)?res.error:"Failed to save."; } if(btn) btn.disabled=false;
+    }
+  }catch(e){ if(al){ al.style.color="#b00020"; al.textContent=e.message; } if(btn) btn.disabled=false; }
+}
+
 // ── Connect ──────────────────────────────────────────────────
 async function connectSheet() {
   const url = document.getElementById("setup-url").value.trim();
@@ -955,7 +1004,7 @@ function renderReminders() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="reminder-days">${d}d ago</span>
-${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openLog("${l.id}")' title="Log a call, text or note">📞 Log</button><button class="btn btn-ghost btn-sm" onclick='openResume("${l.id}")' title="AI: read timeline, draft next touch">✨ Resume</button><button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
+${starBtn(l.id)}${telIcon(l.phone, l.name)}<button class="btn btn-ghost btn-sm" onclick='openLog("${l.id}")' title="Log a call, text or note">📞 Log</button><button class="btn btn-ghost btn-sm" onclick='openResume("${l.id}")' title="AI: read timeline, draft next touch">✨ Resume</button><button class="btn btn-ghost btn-sm" onclick='openBill("${l.id}")' title="Add a bill for this lead">🧾 Bill</button><button class="btn btn-ghost btn-sm" onclick='openEditById("${l.id}")'>Update</button>
           </div>
         </div>`;
       }).join("")}
@@ -1034,6 +1083,7 @@ function renderCharts() {
             (loadUrl() ? '<a href="' + loadUrl() + '?action=modelSim&id=' + encodeURIComponent(l.id) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#0B6E4F;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">\u{1F50B} Model</a>' : '') +
             '<button class="btn btn-ghost btn-sm" onclick=\'openLog("' + l.id + '")\' style="font-size:13px;" title="Log a call, text or note">📞 Log</button>' +
             '<button class="btn btn-ghost btn-sm" onclick=\'openResume("' + l.id + '")\' style="font-size:13px;" title="AI: read timeline, draft next touch">✨ Resume</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick=\'openBill("' + l.id + '")\' style="font-size:13px;" title="Add a bill for this lead">🧾 Bill</button>' +
             '<button class="btn btn-ghost btn-sm" onclick=\'openEditById("' + l.id + '")\' style="font-size:13px;">Update</button>' +
           '</div></div>';
       }).join("");
@@ -1076,6 +1126,7 @@ function renderCharts() {
         <td><div style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="openLog('${l.id}')" title="Log a call, text or note">📞 Log</button>
           <button class="btn btn-ghost btn-sm" onclick="openResume('${l.id}')" title="AI: read timeline, draft next touch">✨ Resume</button>
+          <button class="btn btn-ghost btn-sm" onclick="openBill('${l.id}')" title="Add a bill for this lead">🧾 Bill</button>
           <button class="btn btn-ghost btn-sm" onclick="whyHere('${l.id}')" title="Why is this lead here?">Why?</button>
           <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>Edit</button>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteLead('${l.id}','${(l.name||"").replace(/'/g,"&#39;")}')">Del</button>
